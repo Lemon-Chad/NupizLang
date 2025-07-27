@@ -114,12 +114,27 @@ int disassembleInstruction(Chunk* chunk, int offset) {
         SIMPLE_INST(OP_NULL);
         SIMPLE_INST(OP_INHERIT);
         SIMPLE_INST(OP_POP);
+        SIMPLE_INST(OP_GET_INDEX);
+        SIMPLE_INST(OP_SET_INDEX);
         BYTE_INST(OP_POP_N);
+        BYTE_INST(OP_MAKE_LIST);
 
         CONST_INST(OP_GET_PROPERTY);
         CONST_INST(OP_SET_PROPERTY);
-        CONST_INST(OP_METHOD);
         CONST_INST(OP_GET_SUPER);
+
+        case OP_METHOD: {
+            bool isBuilder = chunk->code[offset++] == 1;
+            if (isBuilder) {
+                printf("%-16s INITIALIZER\n", "OP_METHOD");
+            } else {
+                uint8_t constant = chunk->code[offset++];
+                printf("%-16s %4d '", "OP_METHOD", constant);
+                printValue(chunk->constants.values[constant]);
+                printf("'\n");
+            }
+            return offset;
+        }
 
         INVOKE_INST(OP_INVOKE);
         INVOKE_INST(OP_SUPER_INVOKE);

@@ -99,6 +99,12 @@ ObjBoundMethod* newBoundMethod(VM* vm, Value reciever, ObjClosure* method) {
     return bound;
 }
 
+ObjList* newList(VM* vm) {
+    ObjList* list = ALLOCATE_OBJ(vm, ObjList, OBJ_LIST);
+    initValueArray(&list->list);
+    return list;
+}
+
 ObjString* takeString(VM* vm, const char* src, int len) {
     uint32_t hash = hashString(src, len);
     ObjString* interned = tableFindString(&vm->strings, src, len, hash);
@@ -187,6 +193,11 @@ ObjString* strObject(VM* vm, Value val) {
             return formatString(vm, "<class %s>", AS_CLASS(val)->name->chars);
         case OBJ_INSTANCE:
             return strInstance(vm, AS_INSTANCE(val));
+        case OBJ_LIST: {
+            ObjList* list = AS_LIST(val);
+            return formatString(vm, "[ %p (%d|%d) ]", list, 
+                list->list.count, list->list.capacity);
+        }
     }
     return formatString(vm, "undefined");
 }
@@ -217,6 +228,11 @@ void printObject(Value val) {
         case OBJ_INSTANCE:
             printInstance(AS_INSTANCE(val));
             break;
+        case OBJ_LIST: {
+            ObjList* list = AS_LIST(val);
+            printf("[ %p (%d|%d) ]", list, list->list.count, list->list.capacity);
+            break;
+        }
         default:
             printf("undefined");
             break;

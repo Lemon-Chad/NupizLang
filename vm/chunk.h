@@ -48,6 +48,9 @@ typedef enum {
     OP_INHERIT,
     OP_GET_SUPER,
     OP_SUPER_INVOKE,
+    OP_MAKE_LIST,
+    OP_GET_INDEX,
+    OP_SET_INDEX,
 } OpCode;
 
 struct Chunk {

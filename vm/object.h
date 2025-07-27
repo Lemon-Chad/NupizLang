@@ -17,6 +17,7 @@
 #define IS_CLASS(val) isObjType(val, OBJ_CLASS)
 #define IS_INSTANCE(val) isObjType(val, OBJ_INSTANCE)
 #define IS_BOUND_METHOD(val) isObjType(val, OBJ_BOUND_METHOD)
+#define IS_LIST(val) isObjType(val, OBJ_LIST)
 
 #define AS_STRING(val) ((ObjString*) AS_OBJ(val))
 #define AS_CSTRING(val) (((ObjString*) AS_OBJ(val))->chars)
@@ -26,6 +27,7 @@
 #define AS_CLASS(val) ((ObjClass*) AS_OBJ(val))
 #define AS_INSTANCE(val) ((ObjInstance*) AS_OBJ(val))
 #define AS_BOUND_METHOD(val) ((ObjBoundMethod*) AS_OBJ(val))
+#define AS_LIST(val) ((ObjList*) AS_OBJ(val))
 
 typedef enum {
     OBJ_STRING,
@@ -36,6 +38,7 @@ typedef enum {
     OBJ_CLASS,
     OBJ_INSTANCE,
     OBJ_BOUND_METHOD,
+    OBJ_LIST,
 } ObjType;
 
 struct Obj {
@@ -93,6 +96,11 @@ struct ObjBoundMethod {
     ObjClosure* method;
 };
 
+struct ObjList {
+    Obj obj;
+    ValueArray list;
+};
+
 typedef Value (*NativeFn)(VM* vm, int argc, Value* args);
 
 typedef struct {
@@ -106,6 +114,7 @@ ObjNative* newNative(VM* vm, NativeFn func);
 ObjClass* newClass(VM* vm, ObjString* name);
 ObjInstance* newInstance(VM* vm, ObjClass* clazz);
 ObjBoundMethod* newBoundMethod(VM* vm, Value reciever, ObjClosure* method);
+ObjList* newList(VM* vm);
 
 static inline bool isObjType(Value val, ObjType type) {
     return IS_OBJ(val) && AS_OBJ(val)->type == type;

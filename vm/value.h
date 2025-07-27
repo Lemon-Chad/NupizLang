@@ -10,6 +10,7 @@ typedef struct ObjUpvalue ObjUpvalue;
 typedef struct ObjClass ObjClass;
 typedef struct ObjInstance ObjInstance;
 typedef struct ObjBoundMethod ObjBoundMethod;
+typedef struct ObjList ObjList;
 
 typedef struct VM VM;
 typedef struct Chunk Chunk;

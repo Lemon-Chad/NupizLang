@@ -420,9 +420,9 @@ static void varDeclaration(Parser* parser, bool constant) {
     defineVariable(parser, global);
 }
 
-static uint8_t argumentList(Parser* parser) {
+static uint8_t valueList(Parser* parser, TokenType closing, const char* msg) {
     uint8_t argc = 0;
-    if (!check(parser, TOKEN_RIGHT_PAREN)) {
+    if (!check(parser, closing)) {
         do {
             expression(parser);
             if (argc >= 255) {
@@ -431,8 +431,12 @@ static uint8_t argumentList(Parser* parser) {
             argc++;
         } while (match(parser, TOKEN_COMMA));
     }
-    consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after arguments.");
+    consume(parser, closing, msg);
     return argc;
+}
+
+static uint8_t argumentList(Parser* parser) {
+    return valueList(parser, TOKEN_RIGHT_PAREN, "Expected ')' after arguments.");
 }
 
 static void beginScope(Parser* parser) {
@@ -563,7 +567,7 @@ static void method(Parser* parser) {
 
     FunctionType type = FUNC_METHOD;
     function(parser, type);
-    emitBytes(parser, OP_METHOD, constant);
+    emitBytes(parser, OP_METHOD, 0);
     emitByte(parser, constant);
 }
 
@@ -947,6 +951,19 @@ static void dot(Parser* parser, bool canAssign) {
     }
 }
 
+static void indx(Parser* parser, bool canAssign) {
+    parsePrecedence(parser, PREC_CALL);
+    consume(parser, TOKEN_RIGHT_BRACKET, "Expected ']' after index.");
+
+    if (canAssign && match(parser, TOKEN_EQUAL)) {
+        expression(parser);
+        emitByte(parser, OP_SET_INDEX);
+    } else {
+        emitByte(parser, OP_GET_INDEX);
+    }
+}
+
+
 static void number(Parser* parser, bool canAssign) {
     double val = strtod(parser->previous.start, NULL);
     emitConstant(parser, NUMBER_VAL(val));
@@ -1039,6 +1056,11 @@ static void literal(Parser* parser, bool canAssign) {
     }
 }
 
+static void list(Parser* parser, bool canAssign) {
+    uint8_t argc = valueList(parser, TOKEN_RIGHT_BRACKET, "Expected ']' after list.");
+    emitBytes(parser, OP_MAKE_LIST, argc);
+}
+
 // Rules && Grammar
 
 ParseRule RULES[] = {
@@ -1075,6 +1097,7 @@ ParseRule RULES[] = {
     [TOKEN_OR]            = {NULL,     or_,    PREC_OR},
     [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
     [TOKEN_SUPER]         = {super_,   NULL,   PREC_NONE},
+    [TOKEN_LEFT_BRACKET]  = {list,     indx,   PREC_CALL},
     [TOKEN_THIS]          = {this_,    NULL,   PREC_NONE},
     [TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE},
     [TOKEN_LET]           = {NULL,     NULL,   PREC_NONE},

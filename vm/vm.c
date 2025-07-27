@@ -70,6 +70,44 @@ static Value asStringNative(VM* vm, int argc, Value* args) {
     return OBJ_VAL(strValue(vm, args[0]));
 }
 
+static Value lengthNative(VM* vm, int argc, Value* args) {
+    if (argc != 1) {
+        runtimeError(vm, "Expected 1 arg, got %d.", argc);
+        return NULL_VAL;
+    }
+
+    Value arg = args[0];
+    if (IS_STRING(arg)) {
+        return NUMBER_VAL(strlen(AS_CSTRING(arg)));
+    } else if (IS_LIST(arg)) {
+        return NUMBER_VAL(AS_LIST(arg)->list.count);
+    }
+
+    runtimeError(vm, "Cannot measure length of given type.", argc);
+    return NULL_VAL;
+}
+
+static Value appendNative(VM* vm, int argc, Value* args) {
+    if (argc != 2) {
+        runtimeError(vm, "Expected 2 args, got %d.", argc);
+        return NULL_VAL;
+    }
+
+    Value list = args[0];
+    Value ele = args[1];
+    if (!IS_LIST(list)) {
+        runtimeError(vm, "Expected a list as a first arg.");
+        return NULL_VAL;
+    }
+
+    push(vm, list);
+    push(vm, ele);
+    writeValueArray(vm, &AS_LIST(list)->list, ele);
+    popn(vm, 2);
+
+    return NUMBER_VAL(AS_LIST(list)->list.count);
+}
+
 static Value clockNative(VM* vm, int argc, Value* args) {
     return NUMBER_VAL(((double) clock()) / CLOCKS_PER_SEC);
 }
@@ -92,6 +130,8 @@ void initVM(VM* vm) {
     defineNative(vm, "print", printNative);
     defineNative(vm, "println", printlnNative);
     defineNative(vm, "asString", asStringNative);
+    defineNative(vm, "length", lengthNative);
+    defineNative(vm, "append", appendNative);
 
     defineNative(vm, "clock", clockNative);
 }
@@ -327,7 +367,7 @@ static InterpretResult run(VM* vm) {
                     runtimeError(vm, "DTypeErr: Operand must be a number.");
                     return INTERPRET_RUNTIME_ERR;
                 }
-                push(vm, NUMBER_VAL(-AS_NUMBER(pop(vm))));
+                vm->stackTop[-1].as.number = -vm->stackTop[-1].as.number;
                 break;
             case OP_NOT:
                 push(vm, BOOL_VAL(isFalsey(pop(vm))));
@@ -593,6 +633,63 @@ static InterpretResult run(VM* vm) {
                 }
 
                 frame = &vm->frames[vm->frameCount - 1];
+                break;
+            }
+
+            case OP_MAKE_LIST: {
+                int argc = READ_BYTE();
+                ObjList* list = newList(vm);
+                for (int i = 0; i < argc; i++)
+                    writeValueArray(vm, &list->list, peek(vm, argc - i - 1));
+                popn(vm, argc);
+                push(vm, OBJ_VAL(list));
+                break;
+            }
+
+            case OP_GET_INDEX: {
+                Value b = pop(vm);
+                Value a = pop(vm);
+                if (IS_LIST(a) && IS_NUMBER(b)) {
+                    ObjList* lst = AS_LIST(a);
+                    int idx = (int) AS_NUMBER(b);
+                    if (idx < 0)
+                        idx += lst->list.count;
+                    
+                    if (idx >= lst->list.count || idx < 0) {
+                        runtimeError(vm, "Index out of bounds.");
+                        return INTERPRET_RUNTIME_ERR;
+                    }
+                    push(vm, lst->list.values[idx]);
+                } else {
+                    runtimeError(vm, "Invalid index getting operation recipients.");
+                    return INTERPRET_RUNTIME_ERR;
+                }
+                break;
+            }
+
+            case OP_SET_INDEX: {
+                Value newVal = peek(vm, 0);
+                Value b = peek(vm, 1);
+                Value a = peek(vm, 2);
+                if (IS_LIST(a) && IS_NUMBER(b)) {
+                    ObjList* lst = AS_LIST(a);
+                    int idx = (int) AS_NUMBER(b);
+                    if (idx < 0)
+                        idx += lst->list.count;
+                    
+                    if (idx >= lst->list.count || idx < 0) {
+                        runtimeError(vm, "Index out of bounds.");
+                        return INTERPRET_RUNTIME_ERR;
+                    }
+
+                    lst->list.values[idx] = newVal;
+
+                    popn(vm, 3);
+                    push(vm, newVal);
+                } else {
+                    runtimeError(vm, "Invalid index setting operation recipients.");
+                    return INTERPRET_RUNTIME_ERR;
+                }
                 break;
             }
         }

@@ -40,6 +40,13 @@ static void freeObject(VM* vm, Obj* obj) {
             FREE(vm, ObjBoundMethod, obj);
             break;
         
+        case OBJ_LIST: {
+            ObjList* list = (ObjList*) obj;
+            freeValueArray(vm, &list->list);
+            FREE(vm, ObjList, obj);
+            break;
+        }
+        
         case OBJ_CLASS: {
             ObjClass* clazz = (ObjClass*) obj;
             freeTable(vm, &clazz->methods);
@@ -169,6 +176,12 @@ static void blackenObject(VM* vm, Obj* obj) {
             ObjBoundMethod* bound = (ObjBoundMethod*) obj;
             markValue(vm, bound->reciever);
             markObject(vm, (Obj*) bound->method);
+            break;
+        }
+
+        case OBJ_LIST: {
+            ObjList* list = (ObjList*) obj;
+            markArray(vm, &list->list);
             break;
         }
 

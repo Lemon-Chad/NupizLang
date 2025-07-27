@@ -204,6 +204,8 @@ Token scanToken(Scanner* scanner) {
         case ')': return makeToken(scanner, TOKEN_RIGHT_PAREN);
         case '{': return makeToken(scanner, TOKEN_LEFT_BRACE);
         case '}': return makeToken(scanner, TOKEN_RIGHT_BRACE);
+        case '[': return makeToken(scanner, TOKEN_LEFT_BRACKET);
+        case ']': return makeToken(scanner, TOKEN_RIGHT_BRACKET);
         case ';': return makeToken(scanner, TOKEN_SEMICOLON);
         case ',': return makeToken(scanner, TOKEN_COMMA);
         case '.': return makeToken(scanner, TOKEN_DOT);

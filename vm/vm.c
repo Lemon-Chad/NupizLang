@@ -108,6 +108,61 @@ static Value appendNative(VM* vm, int argc, Value* args) {
     return NUMBER_VAL(AS_LIST(list)->list.count);
 }
 
+static Value removeNative(VM* vm, int argc, Value* args) {
+    if (argc != 2) {
+        runtimeError(vm, "Expected 2 args, got %d.", argc);
+        return NULL_VAL;
+    }
+
+    Value list = args[0];
+    Value ele = args[1];
+    if (!IS_LIST(list)) {
+        runtimeError(vm, "Expected a list as a first arg.");
+        return NULL_VAL;
+    }
+    if (!IS_NUMBER(ele)) {
+        runtimeError(vm, "Expected a number index as a second arg.");
+        return NULL_VAL;
+    }
+
+    int idx = (int) AS_NUMBER(ele);
+    ValueArray* array = &AS_LIST(list)->list;
+    if (idx < 0)
+        idx += array->count;
+    
+    if (idx < 0 || idx >= array->count) {
+        runtimeError(vm, "Index out of bounds.");
+        return NULL_VAL;
+    }
+
+    memcpy(array->values + idx, array->values + idx + 1, 
+        sizeof(Value) * (array->count-- - idx));
+
+    return NUMBER_VAL(array->count);
+}
+
+static Value popNative(VM* vm, int argc, Value* args) {
+    if (argc != 1) {
+        runtimeError(vm, "Expected 1 arg, got %d.", argc);
+        return NULL_VAL;
+    }
+
+    Value list = args[0];
+    if (!IS_LIST(list)) {
+        runtimeError(vm, "Expected a list as a first arg.");
+        return NULL_VAL;
+    }
+
+    ValueArray* array = &AS_LIST(list)->list;
+    if (array->count == 0) {
+        runtimeError(vm, "Given list is empty.");
+        return NULL_VAL;
+    }
+
+    array->count--;
+    return array->values[array->count];
+}
+
 static Value clockNative(VM* vm, int argc, Value* args) {
     return NUMBER_VAL(((double) clock()) / CLOCKS_PER_SEC);
 }
@@ -131,7 +186,10 @@ void initVM(VM* vm) {
     defineNative(vm, "println", printlnNative);
     defineNative(vm, "asString", asStringNative);
     defineNative(vm, "length", lengthNative);
+
     defineNative(vm, "append", appendNative);
+    defineNative(vm, "remove", removeNative);
+    defineNative(vm, "pop", popNative);
 
     defineNative(vm, "clock", clockNative);
 }

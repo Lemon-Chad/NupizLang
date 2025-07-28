@@ -3,10 +3,10 @@
 #include <string.h>
 #include <time.h>
 
-#include "common.h"
-#include "compiler.h"
-#include "debug.h"
-#include "memory.h"
+#include "../util/common.h"
+#include "../compiler/compiler.h"
+#include "../util/debug.h"
+#include "../util/memory.h"
 #include "object.h"
 #include "value.h"
 #include "vm.h"

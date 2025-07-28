@@ -2,8 +2,8 @@
 #ifndef jp_chunk_h
 #define jp_chunk_h
 
-#include "common.h"
-#include "value.h"
+#include "../util/common.h"
+#include "../vm/value.h"
 
 typedef enum {
     OP_CONSTANT,

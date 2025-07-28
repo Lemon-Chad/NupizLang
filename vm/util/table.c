@@ -1,9 +1,8 @@
 #include <string.h>
 
 #include "memory.h"
-#include "object.h"
+#include "../vm/object.h"
 #include "table.h"
-#include "value.h"
 
 #define TABLE_MAX_LOAD 0.75
 

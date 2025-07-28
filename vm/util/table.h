@@ -3,7 +3,7 @@
 #define jp_table_h
 
 #include "common.h"
-#include "value.h"
+#include "../vm/value.h"
 
 typedef struct {
     ObjString* key;

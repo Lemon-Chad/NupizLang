@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#include "object.h"
+#include "../vm/object.h"
 #include "memory.h"
 
 #define GC_HEAP_GROWTH_FACTOR 2

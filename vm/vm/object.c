@@ -3,9 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "memory.h"
+#include "../util/memory.h"
 #include "object.h"
-#include "table.h"
+#include "../util/table.h"
 #include "value.h"
 #include "vm.h"
 

@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common.h"
+#include "../util/common.h"
 #include "compiler.h"
-#include "memory.h"
+#include "../util/memory.h"
 #include "scanner.h"
 
 #ifdef DEBUG_PRINT_CODE

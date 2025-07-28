@@ -1,7 +1,7 @@
 
 CFLAGS = -Wall
 
-SRC=$(wildcard *.c)
+SRC=$(wildcard *.c */*.c)
 
 all: $(SRC)
 	gcc -Wno-incompatible-pointer-types-discards-qualifiers -o ../build/main $^ $(CFLAGS) $(LIBS)

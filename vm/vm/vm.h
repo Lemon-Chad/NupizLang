@@ -2,10 +2,10 @@
 #ifndef jp_vm_h
 #define jp_vm_h
 
-#include "chunk.h"
-#include "compiler.h"
+#include "../compiler/chunk.h"
+#include "../compiler/compiler.h"
 #include "object.h"
-#include "table.h"
+#include "../util/table.h"
 #include "value.h"
 
 #define FRAMES_MAX 64

@@ -2,9 +2,9 @@
 #ifndef jp_object_h
 #define jp_object_h
 
-#include "common.h"
-#include "chunk.h"
-#include "table.h"
+#include "../util/common.h"
+#include "../compiler/chunk.h"
+#include "../util/table.h"
 #include "value.h"
 #include "vm.h"
 

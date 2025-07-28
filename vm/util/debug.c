@@ -2,8 +2,8 @@
 
 #include "debug.h"
 #include "table.h"
-#include "object.h"
-#include "value.h"
+#include "../vm/object.h"
+#include "../vm/value.h"
 
 void disassembleChunk(Chunk* chunk, const char* name) {
     printf("== %s ==\n", name);

@@ -3,8 +3,8 @@
 #define jp_memory_h
 
 #include "common.h"
-#include "compiler.h"
-#include "vm.h"
+#include "../compiler/compiler.h"
+#include "../vm/vm.h"
 
 #ifdef DEBUG_LOG_GC
 #include <stdio.h>

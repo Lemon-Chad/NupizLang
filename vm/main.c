@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common.h"
-#include "chunk.h"
-#include "debug.h"
-#include "vm.h"
+#include "util/common.h"
+#include "compiler/chunk.h"
+#include "util/debug.h"
+#include "vm/vm.h"
 
 static void repl(VM* vm) {
     printf("Repl\n");

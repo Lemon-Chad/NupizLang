@@ -168,6 +168,10 @@ static void printFunction(ObjFunction* func) {
 }
 
 static ObjString* strInstance(VM* vm, ObjInstance* inst) {
+    NativeResult res = callDefaultMethod(vm, inst, DEFMTH_STRING, NULL, 0);
+    if (res.success) {
+        return AS_STRING(res.val);
+    }
     return formatString(vm, "<%p %s>", (void*) inst, inst->clazz->name->chars);
 }
 

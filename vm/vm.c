@@ -67,7 +67,8 @@ static Value asStringNative(VM* vm, int argc, Value* args) {
         return NULL_VAL;
     }
 
-    return OBJ_VAL(strValue(vm, args[0]));
+    Value val = OBJ_VAL(strValue(vm, args[0]));
+    return val;
 }
 
 static Value lengthNative(VM* vm, int argc, Value* args) {
@@ -302,6 +303,27 @@ static bool bindMethod(VM* vm, ObjClass* clazz, ObjString* name) {
     return true;
 }
 
+NativeResult callDefaultMethod(VM* vm, ObjInstance* inst, int idx, Value* args, int argc) {
+    if (inst->clazz->defaultMethods[idx] == NULL) {
+        return NATIVE_FAIL;
+    }
+
+    push(vm, OBJ_VAL(inst));
+    for (int i = 0; i < argc; i++)
+        push(vm, args[i]);
+
+    ObjClosure* clos = inst->clazz->defaultMethods[idx];
+    if (!call(vm, clos, argc))
+        return NATIVE_FAIL;
+
+    InterpretResult res = run(vm);
+    if (res == INTERPRET_RUNTIME_ERR)
+        return NATIVE_FAIL;
+    
+    Value val = pop(vm);
+    return NATIVE_OK(val);
+}
+
 static ObjUpvalue* captureUpvalue(VM* vm, Value* local) {
     ObjUpvalue* prev = NULL;
     ObjUpvalue* curr = vm->openUpvalues;
@@ -362,6 +384,25 @@ static void defineMethod(VM* vm, ObjString* name) {
     pop(vm);
 }
 
+static void defineDefMethod(VM* vm, int idx) {
+    Value method = peek(vm, 0);
+    ObjClass* clazz = AS_CLASS(peek(vm, 1));
+    clazz->defaultMethods[idx] = AS_CLOSURE(method);
+
+    ObjString* name = NULL;
+    switch (idx) {
+        case DEFMTH_STRING:
+            name = formatString(vm, "string");
+            break;
+        default:
+            runtimeError(vm, "Unkown default method '%d'.", idx);
+            break;
+    }
+    tableSet(vm, &clazz->methods, name, method);
+    
+    pop(vm);
+}
+
 static void defineBuilder(VM* vm) {
     Value method = peek(vm, 0);
     ObjClass* clazz = AS_CLASS(peek(vm, 1));
@@ -369,8 +410,9 @@ static void defineBuilder(VM* vm) {
     pop(vm);
 }
 
-static InterpretResult run(VM* vm) {
+InterpretResult run(VM* vm) {
     CallFrame* frame = &vm->frames[vm->frameCount - 1];
+    int exitLevel = vm->frameCount - 1;
     #define READ_BYTE() (*(frame->ip++))
     #define READ_SHORT() (frame->ip += 2, (uint16_t) ((frame->ip[-2] << 8) | frame->ip[-1]))
     #define READ_CONSTANT() (frame->closure->function->chunk.constants.values[READ_BYTE()])
@@ -474,6 +516,11 @@ static InterpretResult run(VM* vm) {
                 vm->stackTop = frame->slots;
                 push(vm, res);
                 frame = &vm->frames[vm->frameCount - 1];
+
+                if (vm->frameCount == exitLevel) {
+                    return INTERPRET_OK;
+                }
+
                 break;
             }
             
@@ -638,9 +685,11 @@ static InterpretResult run(VM* vm) {
             }
 
             case OP_METHOD: {
-                bool isBuilder = READ_BYTE() == 1;
-                if (isBuilder) {
+                int methodType = READ_BYTE();
+                if (methodType == 1) {
                     defineBuilder(vm);
+                } else if (methodType == 2) {
+                    defineDefMethod(vm, READ_BYTE());
                 } else {
                     defineMethod(vm, READ_STRING());
                 }
@@ -659,14 +708,19 @@ static InterpretResult run(VM* vm) {
             }
 
             case OP_INHERIT: {
-                Value superclass = peek(vm, 1);
-                if (!IS_CLASS(superclass)) {
+                Value val = peek(vm, 1);
+                if (!IS_CLASS(val)) {
                     runtimeError(vm, "Cannot inherit from non-class objects.");
                     return INTERPRET_RUNTIME_ERR;
                 }
-                ObjClass* subclass = AS_CLASS(peek(vm, 0));
 
-                tableAddAll(vm, &AS_CLASS(superclass)->methods, &subclass->methods);
+                ObjClass* subclass = AS_CLASS(peek(vm, 0));
+                ObjClass* superclass = AS_CLASS(val);
+
+                tableAddAll(vm, &superclass->methods, &subclass->methods);
+                for (int i = 0; i < DEFAULT_METHOD_COUNT; i++)
+                    subclass->defaultMethods[i] = superclass->defaultMethods[i];    
+
                 pop(vm);
                 break;
             }

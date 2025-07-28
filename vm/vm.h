@@ -4,6 +4,7 @@
 
 #include "chunk.h"
 #include "compiler.h"
+#include "object.h"
 #include "table.h"
 #include "value.h"
 
@@ -17,6 +18,14 @@ typedef struct {
     uint8_t* ip;
     Value* slots;
 } CallFrame;
+
+typedef struct {
+    bool success;
+    Value val;
+} NativeResult;
+
+#define NATIVE_OK(val) ((NativeResult) { true, val })
+#define NATIVE_FAIL ((NativeResult) { false, NULL_VAL })
 
 struct VM {
     CallFrame frames[FRAMES_MAX];
@@ -38,6 +47,8 @@ struct VM {
     size_t nextGC;
 
     Compiler* compiler;
+
+    bool safeMode;
 };
 
 typedef enum {
@@ -53,5 +64,8 @@ InterpretResult interpret(VM* vm, const char* src);
 void push(VM* vm, Value value);
 Value pop(VM* vm);
 void popn(VM* vm, int n);
+InterpretResult run(VM* vm);
+
+NativeResult callDefaultMethod(VM* vm, ObjInstance* inst, int idx, Value* args, int argc);
 
 #endif

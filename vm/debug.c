@@ -124,9 +124,12 @@ int disassembleInstruction(Chunk* chunk, int offset) {
         CONST_INST(OP_GET_SUPER);
 
         case OP_METHOD: {
-            bool isBuilder = chunk->code[offset++] == 1;
-            if (isBuilder) {
+            int methodType = chunk->code[offset++];
+            if (methodType == 1) {
                 printf("%-16s INITIALIZER\n", "OP_METHOD");
+            } else if (methodType == 2) {
+                uint8_t defMethodIdx = chunk->code[offset++];
+                printf("%-16s %4d DEFAULT\n", "OP_METHOD", defMethodIdx);
             } else {
                 uint8_t constant = chunk->code[offset++];
                 printf("%-16s %4d '", "OP_METHOD", constant);

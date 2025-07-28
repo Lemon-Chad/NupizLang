@@ -312,6 +312,12 @@ static bool identifiersEqual(Token* a, Token* b) {
     return memcmp(a->start, b->start, a->length) == 0;
 }
 
+static bool identifierEquals(Token* a, const char* text) {
+    if (a->length != strlen(text))
+        return false;
+    return memcmp(a->start, text, a->length) == 0;
+}
+
 static int resolveLocal(Parser* parser, Compiler* compiler, Token* tok) {
     for (int i = compiler->localCount - 1; i >= 0; i--) {
         Local* local = &compiler->locals[i];
@@ -562,12 +568,26 @@ static void synchronize(Parser* parser) {
 }
 
 static void method(Parser* parser) {
+    bool isDefaultMethod = false;
+    uint8_t constant = 0;
+    if (match(parser, TOKEN_DEF))
+        isDefaultMethod = true;
+    
     consume(parser, TOKEN_IDENTIFIER, "Expected method name.");
-    uint8_t constant = identifierConstant(parser, &parser->previous);
+
+    if (isDefaultMethod) {
+        if (identifierEquals(&parser->previous, "string")) {
+            constant = DEFMTH_STRING;
+        } else {
+            error(parser, "Unknown default method.");
+        }
+    } else {
+        constant = identifierConstant(parser, &parser->previous);
+    }
 
     FunctionType type = FUNC_METHOD;
     function(parser, type);
-    emitBytes(parser, OP_METHOD, 0);
+    emitBytes(parser, OP_METHOD, isDefaultMethod ? 2 : 0);
     emitByte(parser, constant);
 }
 

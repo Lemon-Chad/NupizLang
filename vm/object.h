@@ -29,6 +29,8 @@
 #define AS_BOUND_METHOD(val) ((ObjBoundMethod*) AS_OBJ(val))
 #define AS_LIST(val) ((ObjList*) AS_OBJ(val))
 
+#define DEFAULT_METHOD_COUNT 1
+
 typedef enum {
     OBJ_STRING,
     OBJ_FUNCTION,
@@ -82,7 +84,12 @@ struct ObjClass {
     ObjString* name;
     ObjClosure* constructor;
     Table methods;
+    ObjClosure* defaultMethods[DEFAULT_METHOD_COUNT];
 };
+
+typedef enum {
+    DEFMTH_STRING,
+} DefaultMethods;
 
 struct ObjInstance {
     Obj obj;

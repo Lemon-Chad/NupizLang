@@ -2,6 +2,8 @@
 #ifndef jp_value_h
 #define jp_value_h
 
+#include <stdbool.h>
+
 typedef struct Obj Obj;
 typedef struct ObjString ObjString;
 typedef struct ObjFunction ObjFunction;
@@ -16,6 +18,8 @@ typedef struct VM VM;
 typedef struct Chunk Chunk;
 typedef struct Compiler Compiler;
 typedef struct ClassCompiler ClassCompiler;
+
+typedef struct DumpedBytes DumpedBytes;
 
 typedef enum {
     VAL_BOOL,

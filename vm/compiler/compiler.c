@@ -1165,6 +1165,7 @@ ObjFunction* compile(VM* vm, const char* src) {
     parser.panicMode = false;
     parser.vm = vm;
     parser.classCompiler = NULL;
+    parser.compiler = NULL;
 
     Compiler compiler;
     initCompiler(&compiler, &parser, FUNC_SCRIPT);

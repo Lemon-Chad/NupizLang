@@ -1,0 +1,19 @@
+
+class Person {
+  build(name, age) {
+    this.name = name;
+    this.age = age;
+  }
+
+  func sayHello() {
+    println("Hello! My name is " + asString(this.name) + ". I am " + 
+              asString(this.age) + " years old.");
+  }
+
+  func def string() {
+    return this.name + " (" + asString(this.age) + ")";
+  }
+}
+
+var jack = Person("Jack", 19);
+println(asString(jack));

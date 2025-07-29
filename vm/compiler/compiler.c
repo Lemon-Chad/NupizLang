@@ -612,17 +612,63 @@ static void namedVariable(Parser* parser, Token tok, bool canAssign) {
         setOp = OP_SET_GLOBAL;
     }
 
-    if (canAssign && match(parser, TOKEN_EQUAL)) {
-        if (setOp == OP_SET_LOCAL && parser->compiler->locals[arg].fixed) {
-            error(parser, "Variable is constant and cannot be modified.");
-            return;
+    TokenType assignmentToken = TOKEN_NULL;
+    if (canAssign) {
+        if (match(parser, TOKEN_EQUAL)) {
+            assignmentToken = TOKEN_EQUAL;
+        } else if (match(parser, TOKEN_PLUS_EQUAL)) {
+            assignmentToken = TOKEN_PLUS_EQUAL;
+        } else if (match(parser, TOKEN_MINUS_EQUAL)) {
+            assignmentToken = TOKEN_MINUS_EQUAL;
+        } else if (match(parser, TOKEN_STAR_EQUAL)) {
+            assignmentToken = TOKEN_STAR_EQUAL;
+        } else if (match(parser, TOKEN_SLASH_EQUAL)) {
+            assignmentToken = TOKEN_SLASH_EQUAL;
         }
-
-        expression(parser);
-        emitBytes(parser, setOp, (uint8_t) arg);
-    } else {
-        emitBytes(parser, getOp, (uint8_t) arg);
     }
+
+    if (assignmentToken == TOKEN_NULL) {
+        emitBytes(parser, getOp, (uint8_t) arg);
+        return;
+    }
+
+
+    if (setOp == OP_SET_LOCAL && parser->compiler->locals[arg].fixed) {
+        error(parser, "Variable is constant and cannot be modified.");
+        return;
+    }
+
+    if (assignmentToken != TOKEN_EQUAL)
+        emitBytes(parser, getOp, (uint8_t) arg);
+
+    expression(parser);
+
+    switch (assignmentToken) {
+        case TOKEN_PLUS_EQUAL:
+            emitByte(parser, OP_ADD);
+            break;
+        
+        case TOKEN_MINUS_EQUAL:
+            emitByte(parser, OP_SUBTRACT);
+            break;
+        
+        case TOKEN_STAR_EQUAL:
+            emitByte(parser, OP_MULTIPLY);
+            break;
+        
+        case TOKEN_SLASH_EQUAL:
+            emitByte(parser, OP_DIVIDE);
+            break;
+        
+        case TOKEN_EQUAL:
+            break;
+        
+        default:
+            error(parser, "Unhandled assignment token.\n");
+            break;
+    }
+
+    emitBytes(parser, setOp, (uint8_t) arg);
 }
 
 static void variable(Parser* parser, bool canAssign) {

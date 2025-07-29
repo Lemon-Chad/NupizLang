@@ -209,13 +209,19 @@ Token scanToken(Scanner* scanner) {
         case ';': return makeToken(scanner, TOKEN_SEMICOLON);
         case ',': return makeToken(scanner, TOKEN_COMMA);
         case '.': return makeToken(scanner, TOKEN_DOT);
-        case '+': return makeToken(scanner, TOKEN_PLUS);
-        case '/': return makeToken(scanner, TOKEN_SLASH);
-        case '*': return makeToken(scanner, TOKEN_STAR);
+        case '+': 
+            return makeToken(scanner, 
+                match(scanner, '=') ? TOKEN_PLUS_EQUAL : TOKEN_PLUS);
+        case '/': 
+            return makeToken(scanner, 
+                match(scanner, '=') ? TOKEN_SLASH_EQUAL : TOKEN_SLASH);
+        case '*': 
+            return makeToken(scanner, 
+                match(scanner, '=') ? TOKEN_STAR_EQUAL : TOKEN_STAR);
 
         case '-': 
             return makeToken(scanner, 
-                match(scanner, '>') ? TOKEN_RIGHT_ARROW : TOKEN_MINUS);
+                match(scanner, '>') ? TOKEN_RIGHT_ARROW : match(scanner, '=') ? TOKEN_MINUS_EQUAL : TOKEN_MINUS);
         case '!':
             return makeToken(scanner, 
                 match(scanner, '=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);

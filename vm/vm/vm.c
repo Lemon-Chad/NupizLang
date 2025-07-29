@@ -814,11 +814,7 @@ InterpretResult run(VM* vm) {
     #undef BINARY_OP
 }
 
-InterpretResult interpret(VM* vm, const char* src) {
-    ObjFunction* func = compile(vm, src);
-    if (func == NULL)
-        return INTERPRET_COMPILE_ERR;
-    
+InterpretResult runFunc(VM* vm, ObjFunction* func) {
     push(vm, OBJ_VAL(func));
     ObjClosure* clos = newClosure(vm, func);
     pop(vm);
@@ -826,6 +822,14 @@ InterpretResult interpret(VM* vm, const char* src) {
     call(vm, clos, 0);
 
     return run(vm);
+}
+
+InterpretResult interpret(VM* vm, const char* src) {
+    ObjFunction* func = compile(vm, src);
+    if (func == NULL)
+        return INTERPRET_COMPILE_ERR;
+    
+    return runFunc(vm, func);
 }
 
 void push(VM* vm, Value value) {

@@ -29,21 +29,19 @@ void writeByte(VM* vm, DumpedBytes* bytes, uint8_t byte) {
     bytes->bytes[bytes->count++] = byte;
 }
 
-/*
 static void writeInt(VM* vm, DumpedBytes* bytes, int i) {
     writeByte(vm, bytes, i & 0xFF);
     writeByte(vm, bytes, (i >> 8) & 0xFF);
     writeByte(vm, bytes, (i >> 16) & 0xFF);
     writeByte(vm, bytes, (i >> 24) & 0xFF);
 }
-*/
 
 static void writeObject(VM* vm, DumpedBytes* bytes, Obj* obj) {
     switch (obj->type) {
         case OBJ_STRING: {
             ObjString* str = (ObjString*) obj;
             writeByte(vm, bytes, DUMP_STRING);
-            writeByte(vm, bytes, str->length);
+            writeInt(vm, bytes, str->length);
             for (int i = 0; i < str->length; i++)
                 writeByte(vm, bytes, str->chars[i]);
             break;
@@ -84,7 +82,7 @@ void printBytes(DumpedBytes* bytes) {
 }
 
 bool dumpBytes(FILE* fp, DumpedBytes* bytes) {
-    return bytes->count == fwrite(bytes->bytes, bytes->count, bytes->count, fp);
+    return bytes->count == fwrite(bytes->bytes, sizeof(uint8_t), bytes->count, fp);
 }
 
 DumpedBytes* dumpFunction(VM* vm, ObjFunction* func) {
@@ -109,15 +107,15 @@ DumpedBytes* dumpChunk(VM* vm, Chunk* chunk) {
 
     writeByte(vm, bytes, DUMP_CHUNK);
 
-    writeByte(vm, bytes, chunk->lines_count);
+    writeInt(vm, bytes, chunk->lines_count);
     for (int i = 0; i < chunk->lines_count; i++) {
-        writeByte(vm, bytes, chunk->lines[i]);
-        writeByte(vm, bytes, chunk->lines_run[i]);
+        writeInt(vm, bytes, chunk->lines[i]);
+        writeInt(vm, bytes, chunk->lines_run[i]);
     }
 
     takeBytes(vm, bytes, dumpValueArray(vm, &chunk->constants));
 
-    writeByte(vm, bytes, chunk->count);
+    writeInt(vm, bytes, chunk->count);
     for (int i = 0; i < chunk->count; i++)
         writeByte(vm, bytes, chunk->code[i]);
     
@@ -127,7 +125,7 @@ DumpedBytes* dumpChunk(VM* vm, Chunk* chunk) {
 DumpedBytes* dumpValueArray(VM* vm, ValueArray* array) {
     DumpedBytes* bytes = newDumpedBytes(vm);
 
-    writeByte(vm, bytes, array->count);
+    writeInt(vm, bytes, array->count);
     for (int i = 0; i < array->count; i++)
         takeBytes(vm, bytes, dumpValue(vm, array->values[i]));
     

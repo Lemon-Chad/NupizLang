@@ -8,6 +8,7 @@
 #include "vm/vm.h"
 
 #include "compiler/dumper.h"
+#include "vm/loader.h"
 
 #define FLAG_COMPILE        0b00001
 #define FLAG_HELP           0b00010
@@ -63,6 +64,34 @@ static char* readFile(char* path) {
     return buf;
 }
 
+static uint8_t* readFileBytes(char* path, size_t* length) {
+    FILE* fp = fopen(path, "rb");
+    if (fp == NULL) {
+        fprintf(stderr, "Could not open file \"%s\".\n", path);
+        exit(74);
+    }
+
+    fseek(fp, 0, SEEK_END);
+    size_t len = ftell(fp);
+    *length = len;
+    rewind(fp);
+
+    uint8_t* buf = (uint8_t*) malloc(len);
+    if (buf == NULL) {
+        fprintf(stderr, "Not enough memory to read \"%s\".\n", path);
+        exit(74);
+    }
+    size_t bytesRead = fread(buf, sizeof(uint8_t), len, fp);
+    if (bytesRead < len) {
+        fprintf(stderr, "Could not read file \"%s\".\n", path);
+        exit(74);
+    }
+
+    fclose(fp);
+    fp = NULL;
+    return buf;
+}
+
 static void dumpFile(VM* vm, ObjFunction* func, char* path) {
     FILE* fp = fopen(path, "wb");
     if (fp == NULL) {
@@ -71,17 +100,25 @@ static void dumpFile(VM* vm, ObjFunction* func, char* path) {
     }
 
     DumpedBytes* bytes = dumpFunction(vm, func);
-    printBytes(bytes);
-    printf("\n");
-    dumpBytes(fp, bytes);
+    if (!dumpBytes(fp, bytes)) {
+        fprintf(stderr, "Failed to write to file \"%s\".\n", path);
+        exit(74);
+    }
     freeDumpedBytes(vm, bytes);
 
     fclose(fp);
     fp = NULL;
 }
 
-static void loadFile(VM* vm, char* srcPath) {
-    
+static ObjFunction* loadFile(VM* vm, char* path) {
+    size_t length = 0;
+    uint8_t* src = readFileBytes(path, &length);
+
+    BytecodeLoader* loader = newLoader(vm, src, length);
+    ObjFunction* func = readBytecode(loader);
+    freeLoader(vm, loader);
+
+    return func;
 }
 
 static void compileFile(VM* vm, char* srcPath, char* destPath) {
@@ -96,9 +133,8 @@ static void compileFile(VM* vm, char* srcPath, char* destPath) {
 }
 
 static void runFile(VM* vm, char* path) {
-    char* src = readFile(path);
-    InterpretResult res = interpret(vm, src);
-    free(src);
+    ObjFunction* func = loadFile(vm, path);
+    InterpretResult res = runFunc(vm, func);
 
     if (res == INTERPRET_COMPILE_ERR) exit(65);
     if (res == INTERPRET_RUNTIME_ERR) exit(70);

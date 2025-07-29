@@ -4,6 +4,8 @@
 
 #include <stdbool.h>
 
+typedef int int32_t;
+
 typedef struct Obj Obj;
 typedef struct ObjString ObjString;
 typedef struct ObjFunction ObjFunction;
@@ -20,6 +22,7 @@ typedef struct Compiler Compiler;
 typedef struct ClassCompiler ClassCompiler;
 
 typedef struct DumpedBytes DumpedBytes;
+typedef struct BytecodeLoader BytecodeLoader;
 
 typedef enum {
     VAL_BOOL,

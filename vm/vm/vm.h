@@ -60,6 +60,7 @@ typedef enum {
 void initVM(VM* vm);
 void freeVM(VM* vm);
 
+InterpretResult runFunc(VM* vm, ObjFunction* func);
 InterpretResult interpret(VM* vm, const char* src);
 void push(VM* vm, Value value);
 Value pop(VM* vm);

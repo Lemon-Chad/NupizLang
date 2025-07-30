@@ -17,6 +17,7 @@ typedef struct {
     ObjClosure* closure;
     uint8_t* ip;
     Value* slots;
+    Value bound;
 } CallFrame;
 
 typedef struct {
@@ -60,6 +61,7 @@ typedef enum {
 void initVM(VM* vm);
 void freeVM(VM* vm);
 
+InterpretResult runFuncBound(VM* vm, ObjFunction* func, Value binder);
 InterpretResult runFunc(VM* vm, ObjFunction* func);
 InterpretResult interpret(VM* vm, const char* src);
 void push(VM* vm, Value value);

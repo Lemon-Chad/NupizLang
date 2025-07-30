@@ -202,11 +202,78 @@ void freeVM(VM* vm) {
     freeTable(vm, &vm->strings);
 }
 
+static bool getBound(VM* vm, ObjString* name, bool safe) {
+    CallFrame* frame = &vm->frames[vm->frameCount - 1];
+    if (!IS_NULL(frame->bound)) {
+        switch (OBJ_TYPE(frame->bound)) {
+            case OBJ_INSTANCE: {
+                ObjInstance* inst = AS_INSTANCE(frame->bound);
+
+                Value val;
+                if (!tableGet(&inst->fields, name, &val)) {
+                    if (!safe)
+                        runtimeError(vm, "Undefined attribute '%s'.", name->chars);
+                    return false;
+                }
+
+                push(vm, val);
+                return true;
+            }
+
+            case OBJ_NAMESPACE: {
+                ObjNamespace* namespace = AS_NAMESPACE(frame->bound);
+
+                Value val;
+                if (!getNamespace(vm, namespace, name, &val, true)) {
+                    if (!safe)
+                        runtimeError(vm, "Undefined attribute '%s'.", name->chars);
+                    return false;
+                }
+
+                push(vm, val);
+                return true;
+            }
+
+            default:
+                break;
+        }
+    }
+    
+    if (!safe)
+        runtimeError(vm, "Requesting attribute outside of class or instance context.");
+    return false;
+}
+
+static bool setBound(VM* vm, ObjString* name, Value val, bool safe) {
+    CallFrame* frame = &vm->frames[vm->frameCount - 1];
+    if (!IS_NULL(frame->bound)) {
+        switch (OBJ_TYPE(frame->bound)) {
+            case OBJ_INSTANCE: {
+                ObjInstance* inst = AS_INSTANCE(frame->bound);
+
+                if (tableSet(vm, &inst->fields, name, val)) {
+                    tableDelete(&inst->fields, name);
+                    runtimeError(vm, "Undefined attribute '%s'.", name->chars);
+                    return false;
+                }
+                return true;
+            }
+            
+            default:
+                break;
+        }
+    }
+    
+    if (!safe)
+        runtimeError(vm, "Requesting attribute outside of class or instance context.");
+    return false;
+}
+
 static Value peek(VM* vm, int dist) {
     return vm->stackTop[-1 - dist];
 }
 
-static bool call(VM* vm, ObjClosure* clos, int argc) {
+static bool call(VM* vm, ObjClosure* clos, int argc, Value binder) {
     if (argc != clos->function->arity) {
         runtimeError(vm, "Expected %d arguments, but recieved %d.", clos->function->arity, argc);
         return false;
@@ -217,10 +284,14 @@ static bool call(VM* vm, ObjClosure* clos, int argc) {
         return false;
     }
 
+    if (IS_NULL(binder) && vm->frameCount > 0)
+        binder = vm->frames[vm->frameCount - 1].bound;
+
     CallFrame* frame = &vm->frames[vm->frameCount++];
     frame->closure = clos;
     frame->ip = clos->function->chunk.code;
     frame->slots = vm->stackTop - argc - 1;
+    frame->bound = binder;
     return true;
 }
 
@@ -235,13 +306,16 @@ static bool callValue(VM* vm, Value callee, int argc) {
                 return true;
             }
             case OBJ_CLOSURE: {
-                return call(vm, AS_CLOSURE(callee), argc);
+                return call(vm, AS_CLOSURE(callee), argc, NULL_VAL);
             }
             case OBJ_CLASS: {
                 ObjClass* clazz = AS_CLASS(callee);
-                vm->stackTop[-argc - 1] = OBJ_VAL(newInstance(vm, clazz));
+
+                Value inst = OBJ_VAL(newInstance(vm, clazz));
+                vm->stackTop[-argc - 1] = inst;
+
                 if (clazz->constructor != NULL) {
-                    return call(vm, clazz->constructor, argc);
+                    return call(vm, clazz->constructor, argc, inst);
                 } else if (argc != 0) {
                     runtimeError(vm, "Expected 0 args but got %d.", argc);
                     return false;
@@ -251,7 +325,7 @@ static bool callValue(VM* vm, Value callee, int argc) {
             case OBJ_BOUND_METHOD: {
                 ObjBoundMethod* bound = AS_BOUND_METHOD(callee);
                 vm->stackTop[-argc - 1] = bound->reciever;
-                return call(vm, bound->method, argc);
+                return call(vm, bound->method, argc, bound->reciever);
             }
             default:
                 break;
@@ -261,14 +335,14 @@ static bool callValue(VM* vm, Value callee, int argc) {
     return false;
 }
 
-static bool invokeFromClass(VM* vm, ObjClass* clazz, ObjString* name, int argc) {
+static bool invokeFromClass(VM* vm, ObjClass* clazz, ObjString* name, int argc, Value inst) {
     Value method;
     if (!tableGet(&clazz->methods, name, &method)) {
         runtimeError(vm, "Undefined property '%s'.", name->chars);
         return false;
     }
 
-    return call(vm, AS_CLOSURE(method), argc);
+    return call(vm, AS_CLOSURE(method), argc, inst);
 }
 
 static bool invoke(VM* vm, ObjString* name, int argc) {
@@ -287,7 +361,7 @@ static bool invoke(VM* vm, ObjString* name, int argc) {
         return callValue(vm, value, argc);
     }
 
-    return invokeFromClass(vm, inst->clazz, name, argc);
+    return invokeFromClass(vm, inst->clazz, name, argc, reciever);
 }
 
 static bool bindMethod(VM* vm, ObjClass* clazz, ObjString* name) {
@@ -308,12 +382,13 @@ NativeResult callDefaultMethod(VM* vm, ObjInstance* inst, int idx, Value* args, 
         return NATIVE_FAIL;
     }
 
-    push(vm, OBJ_VAL(inst));
+    Value instVal = OBJ_VAL(inst);
+    push(vm, instVal);
     for (int i = 0; i < argc; i++)
         push(vm, args[i]);
 
     ObjClosure* clos = inst->clazz->defaultMethods[idx];
-    if (!call(vm, clos, argc))
+    if (!call(vm, clos, argc, instVal))
         return NATIVE_FAIL;
 
     InterpretResult res = run(vm);
@@ -533,6 +608,10 @@ InterpretResult run(VM* vm) {
 
             case OP_SET_GLOBAL: {
                 ObjString* name = READ_STRING();
+
+                if (setBound(vm, name, peek(vm, 0), true))
+                    break;
+                
                 if (tableSet(vm, &vm->globals, name, peek(vm, 0))) {
                     tableDelete(&vm->globals, name);
                     runtimeError(vm, "Global variable '%s' is undefined.", name->chars);
@@ -544,6 +623,10 @@ InterpretResult run(VM* vm) {
             case OP_GET_GLOBAL: {
                 ObjString* name = READ_STRING();
                 Value val;
+
+                if (getBound(vm, name, true))
+                    break;
+                
                 if (!tableGet(&vm->globals, name, &val)) {
                     runtimeError(vm, "Global variable '%s' is undefined.", name->chars);
                     return INTERPRET_RUNTIME_ERR;
@@ -740,7 +823,7 @@ InterpretResult run(VM* vm) {
                 int argc = READ_BYTE();
                 ObjClass* superclass = AS_CLASS(pop(vm));
 
-                if (!invokeFromClass(vm, superclass, method, argc)) {
+                if (!invokeFromClass(vm, superclass, method, argc, NULL_VAL)) {
                     return INTERPRET_RUNTIME_ERR;
                 }
 
@@ -814,14 +897,18 @@ InterpretResult run(VM* vm) {
     #undef BINARY_OP
 }
 
-InterpretResult runFunc(VM* vm, ObjFunction* func) {
+InterpretResult runFuncBound(VM* vm, ObjFunction* func, Value bound) {
     push(vm, OBJ_VAL(func));
     ObjClosure* clos = newClosure(vm, func);
     pop(vm);
     push(vm, OBJ_VAL(clos));
-    call(vm, clos, 0);
+    call(vm, clos, 0, bound);
 
     return run(vm);
+}
+
+InterpretResult runFunc(VM* vm, ObjFunction* func) {
+    return runFuncBound(vm, func, NULL_VAL);
 }
 
 InterpretResult interpret(VM* vm, const char* src) {

@@ -11,8 +11,6 @@
 #define FRAMES_MAX 64
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
 
-typedef struct ObjFunction ObjFunction;
-
 typedef struct {
     ObjClosure* closure;
     uint8_t* ip;
@@ -20,12 +18,13 @@ typedef struct {
     Value bound;
 } CallFrame;
 
-typedef struct {
+struct NativeResult {
     bool success;
     Value val;
-} NativeResult;
+};
 
-#define NATIVE_OK(val) ((NativeResult) { true, val })
+#define NATIVE_VAL(val) ((NativeResult) { true, val })
+#define NATIVE_OK (NATIVE_VAL(NULL_VAL))
 #define NATIVE_FAIL ((NativeResult) { false, NULL_VAL })
 
 struct VM {
@@ -49,6 +48,8 @@ struct VM {
 
     Compiler* compiler;
 
+    Table libraries;
+
     bool safeMode;
 };
 
@@ -68,6 +69,8 @@ void push(VM* vm, Value value);
 Value pop(VM* vm);
 void popn(VM* vm, int n);
 InterpretResult run(VM* vm);
+
+void runtimeError(VM* vm, const char* format, ...);
 
 NativeResult callDefaultMethod(VM* vm, ObjInstance* inst, int idx, Value* args, int argc);
 

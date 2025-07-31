@@ -8,7 +8,7 @@
 #include "scanner.h"
 
 #ifdef DEBUG_PRINT_CODE
-#include "debug.h"
+#include "../util/debug.h"
 #endif
 
 typedef struct {
@@ -938,6 +938,13 @@ static void grouping(Parser* parser, bool canAssign) {
     consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
 }
 
+static void import(Parser* parser, bool canAssign) {
+    consume(parser, TOKEN_IDENTIFIER, "Expected library name after 'import'.");
+
+    uint8_t constant = identifierConstant(parser, &parser->previous);
+    emitBytes(parser, OP_IMPORT, constant);
+}
+
 static void unary(Parser* parser, bool canAssign) {
     TokenType op = parser->previous.type;
 
@@ -949,6 +956,9 @@ static void unary(Parser* parser, bool canAssign) {
             break;
         case TOKEN_BANG:
             emitByte(parser, OP_NOT);
+            break;
+        case TOKEN_UNPACK:
+            emitByte(parser, OP_UNPACK);
             break;
         default:
             errorAtCurrent(parser, "UNREACHABLE UNARY OPERATOR ERROR");
@@ -1028,7 +1038,6 @@ static void indx(Parser* parser, bool canAssign) {
         emitByte(parser, OP_GET_INDEX);
     }
 }
-
 
 static void number(Parser* parser, bool canAssign) {
     double val = strtod(parser->previous.start, NULL);
@@ -1159,6 +1168,7 @@ ParseRule RULES[] = {
     [TOKEN_FOR]           = {NULL,     NULL,   PREC_NONE},
     [TOKEN_FN]            = {NULL,     NULL,   PREC_NONE},
     [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_IMPORT]        = {import,   NULL,   PREC_NONE},
     [TOKEN_NULL]          = {literal,  NULL,   PREC_NONE},
     [TOKEN_OR]            = {NULL,     or_,    PREC_OR},
     [TOKEN_RETURN]        = {NULL,     NULL,   PREC_NONE},
@@ -1167,6 +1177,7 @@ ParseRule RULES[] = {
     [TOKEN_THIS]          = {this_,    NULL,   PREC_NONE},
     [TOKEN_TRUE]          = {literal,  NULL,   PREC_NONE},
     [TOKEN_LET]           = {NULL,     NULL,   PREC_NONE},
+    [TOKEN_UNPACK]        = {unary,    NULL,   PREC_NONE},
     [TOKEN_VAR]           = {NULL,     NULL,   PREC_NONE},
     [TOKEN_CONST]         = {NULL,     NULL,   PREC_NONE},
     [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE},

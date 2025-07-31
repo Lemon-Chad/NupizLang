@@ -105,6 +105,29 @@ ObjList* newList(VM* vm) {
     return list;
 }
 
+ObjNamespace* newNamespace(VM* vm, ObjString* name) {
+    ObjNamespace* namespace = ALLOCATE_OBJ(vm, ObjNamespace, OBJ_NAMESPACE);
+    
+    namespace->name = name;
+    initTable(&namespace->publics);
+    initTable(&namespace->values);
+
+    return namespace;
+}
+
+bool writeNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value val, bool public) {
+    bool newKey = tableSet(vm, &namespace->values, name, val);
+    if (public)
+        tableSet(vm, &namespace->publics, name, val);
+    return newKey;
+}
+
+bool getNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value* ptr, bool internal) {
+    if (!internal && !tableGet(&namespace->publics, name, ptr))
+        return false;
+    return tableGet(&namespace->values, name, ptr);
+}
+
 ObjString* takeString(VM* vm, const char* src, int len) {
     uint32_t hash = hashString(src, len);
     ObjString* interned = tableFindString(&vm->strings, src, len, hash);
@@ -148,6 +171,17 @@ ObjUpvalue* newUpvalue(VM* vm, Value* slot) {
     upvalue->next = NULL;
     upvalue->closed = NULL_VAL;
     return upvalue;
+}
+
+ObjLibrary* newLibrary(VM* vm, ObjString* name, ImportLibrary init) {
+    ObjLibrary* library = ALLOCATE_OBJ(vm, ObjLibrary, OBJ_LIBRARY);
+
+    library->imported = false;
+    library->initializer = init;
+    library->namespace = NULL;
+    library->name = name;
+
+    return library;
 }
 
 static ObjString* strFunction(VM* vm, ObjFunction* func) {
@@ -202,6 +236,10 @@ ObjString* strObject(VM* vm, Value val) {
             return formatString(vm, "[ %p (%d|%d) ]", list, 
                 list->list.count, list->list.capacity);
         }
+        case OBJ_NAMESPACE:
+            return formatString(vm, "<namespace '%s'>", AS_NAMESPACE(val)->name->chars);
+        case OBJ_LIBRARY:
+            return formatString(vm, "<library '%s'>", AS_LIBRARY(val)->name->chars);
     }
     return formatString(vm, "undefined");
 }
@@ -237,6 +275,12 @@ void printObject(Value val) {
             printf("[ %p (%d|%d) ]", list, list->list.count, list->list.capacity);
             break;
         }
+        case OBJ_NAMESPACE:
+            printf("<namespace %s>", AS_NAMESPACE(val)->name->chars);
+            break;
+        case OBJ_LIBRARY:
+            printf("<library %s>", AS_LIBRARY(val)->name->chars);
+            break;
         default:
             printf("undefined");
             break;

@@ -169,6 +169,9 @@ int disassembleInstruction(Chunk* chunk, int offset) {
 
         BYTE_INST(OP_GET_UPVALUE);
         BYTE_INST(OP_SET_UPVALUE);
+
+        CONST_INST(OP_IMPORT);
+        SIMPLE_INST(OP_UNPACK);
         
         default:
             printf("Unknown opcode %d\n", instruction);

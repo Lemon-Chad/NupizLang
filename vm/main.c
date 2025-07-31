@@ -6,6 +6,7 @@
 #include "compiler/chunk.h"
 #include "util/debug.h"
 #include "vm/vm.h"
+#include "libraries/core/extension.h"
 
 #include "compiler/dumper.h"
 #include "vm/loader.h"

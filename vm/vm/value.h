@@ -15,11 +15,15 @@ typedef struct ObjClass ObjClass;
 typedef struct ObjInstance ObjInstance;
 typedef struct ObjBoundMethod ObjBoundMethod;
 typedef struct ObjList ObjList;
+typedef struct ObjNamespace ObjNamespace;
+typedef struct ObjLibrary ObjLibrary;
 
 typedef struct VM VM;
 typedef struct Chunk Chunk;
 typedef struct Compiler Compiler;
 typedef struct ClassCompiler ClassCompiler;
+
+typedef struct NativeResult NativeResult;
 
 typedef struct DumpedBytes DumpedBytes;
 typedef struct BytecodeLoader BytecodeLoader;
@@ -59,6 +63,9 @@ typedef struct {
     int count;
     Value* values;
 } ValueArray;
+
+typedef NativeResult (*NativeFn)(VM* vm, int argc, Value* args);
+typedef bool (*ImportLibrary)(VM* vm, ObjString* name);
 
 void initValueArray(ValueArray* array);
 void writeValueArray(VM* vm, ValueArray* array, Value value);

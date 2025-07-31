@@ -89,6 +89,18 @@ static void freeObject(VM* vm, Obj* obj) {
             FREE(vm, ObjInstance, obj);
             break;
         }
+
+        case OBJ_NAMESPACE: {
+            ObjNamespace* namespace = (ObjNamespace*) obj;
+            freeTable(vm, &namespace->values);
+            freeTable(vm, &namespace->publics);
+            FREE(vm, ObjNamespace, obj);
+            break;
+        }
+
+        case OBJ_LIBRARY:
+            FREE(vm, ObjLibrary, obj);
+            break;
     }
 }
 
@@ -154,6 +166,7 @@ static void markRoots(VM* vm) {
 
     for (int i = 0; i < vm->frameCount; i++) {
         markObject(vm, (Obj*) vm->frames[i].closure);
+        markValue(vm, vm->frames[i].bound);
     }
 
     for (ObjUpvalue* upv = vm->openUpvalues; upv != NULL; upv = upv->next) {
@@ -161,6 +174,7 @@ static void markRoots(VM* vm) {
     }
 
     markTable(vm, &vm->globals);
+    markTable(vm, &vm->libraries);
     markCompilerRoots(vm, vm->compiler);
 }
 
@@ -219,6 +233,22 @@ static void blackenObject(VM* vm, Obj* obj) {
         case OBJ_UPVALUE:
             markValue(vm, ((ObjUpvalue*) obj)->closed);
             break;
+        
+        case OBJ_NAMESPACE: {
+            ObjNamespace* namespace = (ObjNamespace*) obj;
+            markObject(vm, (Obj*) namespace->name);
+            markTable(vm, &namespace->values);
+            markTable(vm, &namespace->publics);
+            break;
+        }
+
+        case OBJ_LIBRARY: {
+            ObjLibrary* library = (ObjLibrary*) obj;
+            markObject(vm, (Obj*) library->name);
+            if (library->imported)
+                markObject(vm, (Obj*) library->namespace);
+            break;
+        }
 
         case OBJ_STRING:
         case OBJ_NATIVE:

@@ -1,11 +1,11 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
 
 #include "../util/common.h"
 #include "../compiler/compiler.h"
 #include "../util/debug.h"
+#include "../libraries/core/manager.h"
 #include "../util/memory.h"
 #include "object.h"
 #include "value.h"
@@ -17,7 +17,7 @@ static void resetStack(VM* vm) {
     vm->openUpvalues = NULL;
 }
 
-static void runtimeError(VM* vm, const char* format, ...) {
+void runtimeError(VM* vm, const char* format, ...) {
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
@@ -38,136 +38,6 @@ static void runtimeError(VM* vm, const char* format, ...) {
     resetStack(vm);
 }
 
-static void defineNative(VM* vm, const char* name, NativeFn func) {
-    push(vm, OBJ_VAL(copyString(vm, name, strlen(name))));
-    push(vm, OBJ_VAL(newNative(vm, func)));
-    tableSet(vm, &vm->globals, AS_STRING(vm->stack[0]), vm->stack[1]);
-    pop(vm);
-    pop(vm);
-}
-
-static Value printNative(VM* vm, int argc, Value* args) {
-    for (int i = 0; i < argc; i++) {
-        printValue(args[i]);
-        if (i + 1 < argc)
-            printf(" ");
-    }
-    return NULL_VAL;
-}
-
-static Value printlnNative(VM* vm, int argc, Value* args) {
-    printNative(vm, argc, args);
-    printf("\n");
-    return NULL_VAL;
-}
-
-static Value asStringNative(VM* vm, int argc, Value* args) {
-    if (argc != 1) {
-        runtimeError(vm, "Expected 1 arg, got %d.", argc);
-        return NULL_VAL;
-    }
-
-    Value val = OBJ_VAL(strValue(vm, args[0]));
-    return val;
-}
-
-static Value lengthNative(VM* vm, int argc, Value* args) {
-    if (argc != 1) {
-        runtimeError(vm, "Expected 1 arg, got %d.", argc);
-        return NULL_VAL;
-    }
-
-    Value arg = args[0];
-    if (IS_STRING(arg)) {
-        return NUMBER_VAL(strlen(AS_CSTRING(arg)));
-    } else if (IS_LIST(arg)) {
-        return NUMBER_VAL(AS_LIST(arg)->list.count);
-    }
-
-    runtimeError(vm, "Cannot measure length of given type.", argc);
-    return NULL_VAL;
-}
-
-static Value appendNative(VM* vm, int argc, Value* args) {
-    if (argc != 2) {
-        runtimeError(vm, "Expected 2 args, got %d.", argc);
-        return NULL_VAL;
-    }
-
-    Value list = args[0];
-    Value ele = args[1];
-    if (!IS_LIST(list)) {
-        runtimeError(vm, "Expected a list as a first arg.");
-        return NULL_VAL;
-    }
-
-    push(vm, list);
-    push(vm, ele);
-    writeValueArray(vm, &AS_LIST(list)->list, ele);
-    popn(vm, 2);
-
-    return NUMBER_VAL(AS_LIST(list)->list.count);
-}
-
-static Value removeNative(VM* vm, int argc, Value* args) {
-    if (argc != 2) {
-        runtimeError(vm, "Expected 2 args, got %d.", argc);
-        return NULL_VAL;
-    }
-
-    Value list = args[0];
-    Value ele = args[1];
-    if (!IS_LIST(list)) {
-        runtimeError(vm, "Expected a list as a first arg.");
-        return NULL_VAL;
-    }
-    if (!IS_NUMBER(ele)) {
-        runtimeError(vm, "Expected a number index as a second arg.");
-        return NULL_VAL;
-    }
-
-    int idx = (int) AS_NUMBER(ele);
-    ValueArray* array = &AS_LIST(list)->list;
-    if (idx < 0)
-        idx += array->count;
-    
-    if (idx < 0 || idx >= array->count) {
-        runtimeError(vm, "Index out of bounds.");
-        return NULL_VAL;
-    }
-
-    memcpy(array->values + idx, array->values + idx + 1, 
-        sizeof(Value) * (array->count-- - idx));
-
-    return NUMBER_VAL(array->count);
-}
-
-static Value popNative(VM* vm, int argc, Value* args) {
-    if (argc != 1) {
-        runtimeError(vm, "Expected 1 arg, got %d.", argc);
-        return NULL_VAL;
-    }
-
-    Value list = args[0];
-    if (!IS_LIST(list)) {
-        runtimeError(vm, "Expected a list as a first arg.");
-        return NULL_VAL;
-    }
-
-    ValueArray* array = &AS_LIST(list)->list;
-    if (array->count == 0) {
-        runtimeError(vm, "Given list is empty.");
-        return NULL_VAL;
-    }
-
-    array->count--;
-    return array->values[array->count];
-}
-
-static Value clockNative(VM* vm, int argc, Value* args) {
-    return NUMBER_VAL(((double) clock()) / CLOCKS_PER_SEC);
-}
-
 void initVM(VM* vm) {
     resetStack(vm);
     vm->objects = NULL;
@@ -175,6 +45,7 @@ void initVM(VM* vm) {
 
     initTable(&vm->globals);
     initTable(&vm->strings);
+    initTable(&vm->libraries);
 
     vm->grayStack = NULL;
     vm->grayCount = 0;
@@ -183,16 +54,7 @@ void initVM(VM* vm) {
     vm->bytesAllocated = 0;
     vm->nextGC = 1024 * 1024;
 
-    defineNative(vm, "print", printNative);
-    defineNative(vm, "println", printlnNative);
-    defineNative(vm, "asString", asStringNative);
-    defineNative(vm, "length", lengthNative);
-
-    defineNative(vm, "append", appendNative);
-    defineNative(vm, "remove", removeNative);
-    defineNative(vm, "pop", popNative);
-
-    defineNative(vm, "clock", clockNative);
+    defineAllLibraries(vm);
 }
 
 void freeVM(VM* vm) {
@@ -204,7 +66,7 @@ void freeVM(VM* vm) {
 
 static bool getBound(VM* vm, ObjString* name, bool safe) {
     CallFrame* frame = &vm->frames[vm->frameCount - 1];
-    if (!IS_NULL(frame->bound)) {
+    if (IS_OBJ(frame->bound)) {
         switch (OBJ_TYPE(frame->bound)) {
             case OBJ_INSTANCE: {
                 ObjInstance* inst = AS_INSTANCE(frame->bound);
@@ -246,7 +108,7 @@ static bool getBound(VM* vm, ObjString* name, bool safe) {
 
 static bool setBound(VM* vm, ObjString* name, Value val, bool safe) {
     CallFrame* frame = &vm->frames[vm->frameCount - 1];
-    if (!IS_NULL(frame->bound)) {
+    if (IS_OBJ(frame->bound)) {
         switch (OBJ_TYPE(frame->bound)) {
             case OBJ_INSTANCE: {
                 ObjInstance* inst = AS_INSTANCE(frame->bound);
@@ -300,9 +162,13 @@ static bool callValue(VM* vm, Value callee, int argc) {
         switch (OBJ_TYPE(callee)) {
             case OBJ_NATIVE: {
                 NativeFn func = AS_NATIVE(callee);
-                Value res = func(vm, argc, vm->stackTop - argc);
+
+                NativeResult res = func(vm, argc, vm->stackTop - argc);
+                if (!res.success)
+                    return false;
+                
                 vm->stackTop -= argc + 1;
-                push(vm, res);
+                push(vm, res.val);
                 return true;
             }
             case OBJ_CLOSURE: {
@@ -348,20 +214,42 @@ static bool invokeFromClass(VM* vm, ObjClass* clazz, ObjString* name, int argc, 
 static bool invoke(VM* vm, ObjString* name, int argc) {
     Value reciever = peek(vm, argc);
 
-    if (!IS_INSTANCE(reciever)) {
-        runtimeError(vm, "Methods may only be invoked from instances.");
+    if (!IS_OBJ(reciever))
         return false;
+    
+    switch (OBJ_TYPE(reciever)) {
+        case OBJ_INSTANCE: {
+            ObjInstance* inst = AS_INSTANCE(reciever);
+
+            Value value;
+            if (tableGet(&inst->fields, name, &value)) {
+                vm->stackTop[-argc - 1] = value;
+                return callValue(vm, value, argc);
+            }
+
+            return invokeFromClass(vm, inst->clazz, name, argc, reciever);
+        }
+
+        case OBJ_NAMESPACE: {
+            ObjNamespace* namespace = AS_NAMESPACE(reciever);
+            
+            Value value;
+            if (!getNamespace(vm, namespace, name, &value, false)) {
+                runtimeError(vm, "Undefined attribute '%s'.", name->chars);
+                return false;
+            }
+
+            if (IS_CLOSURE(value)) {
+                return call(vm, AS_CLOSURE(value), argc, reciever);
+            }
+
+            return callValue(vm, value, argc);
+        }
+
+        default:
+            runtimeError(vm, "Methods may not be invoked on the given type.");
+            return false;
     }
-
-    ObjInstance* inst = AS_INSTANCE(reciever);
-
-    Value value;
-    if (tableGet(&inst->fields, name, &value)) {
-        vm->stackTop[-argc - 1] = value;
-        return callValue(vm, value, argc);
-    }
-
-    return invokeFromClass(vm, inst->clazz, name, argc, reciever);
 }
 
 static bool bindMethod(VM* vm, ObjClass* clazz, ObjString* name) {
@@ -396,7 +284,7 @@ NativeResult callDefaultMethod(VM* vm, ObjInstance* inst, int idx, Value* args, 
         return NATIVE_FAIL;
     
     Value val = pop(vm);
-    return NATIVE_OK(val);
+    return NATIVE_VAL(val);
 }
 
 static ObjUpvalue* captureUpvalue(VM* vm, Value* local) {
@@ -732,24 +620,53 @@ InterpretResult run(VM* vm) {
             }
         
             case OP_GET_PROPERTY: {
-                if (!IS_INSTANCE(peek(vm, 0))) {
-                    runtimeError(vm, "Cannot access property of non-instance.");
-                    return INTERPRET_RUNTIME_ERR;
-                }
-
-                ObjInstance* inst = AS_INSTANCE(peek(vm, 0));
+                Value accessed = peek(vm, 0);
                 ObjString* name = READ_STRING();
-
-                Value val;
-                if (tableGet(&inst->fields, name, &val)) {
-                    pop(vm);
-                    push(vm, val);
-                    break;
-                }
-
-                if (!bindMethod(vm, inst->clazz, name)) {
+                if (!IS_OBJ(accessed)) {
+                    runtimeError(vm, "Given type does not support property access.");
                     return INTERPRET_RUNTIME_ERR;
                 }
+
+                switch (OBJ_TYPE(accessed)) {
+                    case OBJ_INSTANCE: {
+                        ObjInstance* inst = AS_INSTANCE(accessed);
+
+                        Value val;
+                        if (tableGet(&inst->fields, name, &val)) {
+                            pop(vm);
+                            push(vm, val);
+                            break;
+                        }
+
+                        if (!bindMethod(vm, inst->clazz, name)) {
+                            return INTERPRET_RUNTIME_ERR;
+                        }
+
+                        break;
+                    }
+
+                    case OBJ_NAMESPACE: {
+                        ObjNamespace* namespace = AS_NAMESPACE(accessed);
+
+                        Value val;
+                        if (!getNamespace(vm, namespace, name, &val, false)) {
+                            runtimeError(vm, "Undefined property '%s'.", name->chars);
+                            return INTERPRET_RUNTIME_ERR;
+                        }
+
+                        if (IS_CLOSURE(val))
+                            val = OBJ_VAL(newBoundMethod(vm, accessed, AS_CLOSURE(val)));
+                        
+                        pop(vm);
+                        push(vm, val);
+                        break;
+                    }
+
+                    default:
+                        runtimeError(vm, "Given type does not support property access.");
+                        return INTERPRET_RUNTIME_ERR;
+                }
+
                 break;
             }
 
@@ -885,6 +802,42 @@ InterpretResult run(VM* vm) {
                     runtimeError(vm, "Invalid index setting operation recipients.");
                     return INTERPRET_RUNTIME_ERR;
                 }
+                break;
+            }
+        
+            case OP_IMPORT: {
+                ObjString* lib = READ_STRING();
+                if (!importLibrary(vm, lib)) {
+                    runtimeError(vm, "Undefined library '%s'.", lib->chars);
+                    return INTERPRET_RUNTIME_ERR;
+                }
+
+                Value libVal;
+                tableGet(&vm->libraries, lib, &libVal);
+                
+                push(vm, OBJ_VAL(AS_LIBRARY(libVal)->namespace));
+                break;
+            }
+
+            case OP_UNPACK: {
+                Value op = peek(vm, 0);
+                if (!IS_OBJ(op)) {
+                    runtimeError(vm, "Given type does not support unpacking.");
+                    return INTERPRET_RUNTIME_ERR;
+                }
+
+                switch (OBJ_TYPE(op)) {
+                    case OBJ_NAMESPACE: {
+                        tableAddAll(vm, &AS_NAMESPACE(op)->publics, &vm->globals);
+                        pop(vm);
+                        break;
+                    }
+
+                    default:
+                        runtimeError(vm, "Given type does not support unpacking.");
+                        return INTERPRET_RUNTIME_ERR;
+                }
+
                 break;
             }
         }

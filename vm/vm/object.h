@@ -18,6 +18,8 @@
 #define IS_INSTANCE(val) isObjType(val, OBJ_INSTANCE)
 #define IS_BOUND_METHOD(val) isObjType(val, OBJ_BOUND_METHOD)
 #define IS_LIST(val) isObjType(val, OBJ_LIST)
+#define IS_NAMESPACE(val) isObjType(val, OBJ_NAMESPACE)
+#define IS_LIBRARY(val) isObjType(val, OBJ_LIBRARY)
 
 #define AS_STRING(val) ((ObjString*) AS_OBJ(val))
 #define AS_CSTRING(val) (((ObjString*) AS_OBJ(val))->chars)
@@ -28,6 +30,8 @@
 #define AS_INSTANCE(val) ((ObjInstance*) AS_OBJ(val))
 #define AS_BOUND_METHOD(val) ((ObjBoundMethod*) AS_OBJ(val))
 #define AS_LIST(val) ((ObjList*) AS_OBJ(val))
+#define AS_NAMESPACE(val) ((ObjNamespace*) AS_OBJ(val))
+#define AS_LIBRARY(val) ((ObjLibrary*) AS_OBJ(val))
 
 #define DEFAULT_METHOD_COUNT 1
 
@@ -41,6 +45,8 @@ typedef enum {
     OBJ_INSTANCE,
     OBJ_BOUND_METHOD,
     OBJ_LIST,
+    OBJ_NAMESPACE,
+    OBJ_LIBRARY,
 } ObjType;
 
 struct Obj {
@@ -108,7 +114,20 @@ struct ObjList {
     ValueArray list;
 };
 
-typedef Value (*NativeFn)(VM* vm, int argc, Value* args);
+struct ObjNamespace {
+    Obj obj;
+    ObjString* name;
+    Table publics;
+    Table values;
+};
+
+struct ObjLibrary {
+    Obj obj;
+    ObjString* name;
+    ObjNamespace* namespace;
+    ImportLibrary initializer;
+    bool imported;
+};
 
 typedef struct {
     Obj obj;
@@ -122,6 +141,11 @@ ObjClass* newClass(VM* vm, ObjString* name);
 ObjInstance* newInstance(VM* vm, ObjClass* clazz);
 ObjBoundMethod* newBoundMethod(VM* vm, Value reciever, ObjClosure* method);
 ObjList* newList(VM* vm);
+ObjNamespace* newNamespace(VM* vm, ObjString* name);
+ObjLibrary* newLibrary(VM* vm, ObjString* name, ImportLibrary init);
+
+bool writeNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value val, bool public);
+bool getNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value* ptr, bool internal);
 
 static inline bool isObjType(Value val, ObjType type) {
     return IS_OBJ(val) && AS_OBJ(val)->type == type;

@@ -33,8 +33,6 @@
 #define AS_NAMESPACE(val) ((ObjNamespace*) AS_OBJ(val))
 #define AS_LIBRARY(val) ((ObjLibrary*) AS_OBJ(val))
 
-#define DEFAULT_METHOD_COUNT 1
-
 typedef enum {
     OBJ_STRING,
     OBJ_FUNCTION,
@@ -85,6 +83,13 @@ struct ObjClosure {
     int upvalueCount;
 };
 
+#define DEFAULT_METHOD_COUNT 2
+
+typedef enum {
+    DEFMTH_STRING,
+    DEFMTH_EQ,
+} DefaultMethods;
+
 struct ObjClass {
     Obj obj;
     ObjString* name;
@@ -92,10 +97,6 @@ struct ObjClass {
     Table methods;
     ObjClosure* defaultMethods[DEFAULT_METHOD_COUNT];
 };
-
-typedef enum {
-    DEFMTH_STRING,
-} DefaultMethods;
 
 struct ObjInstance {
     Obj obj;

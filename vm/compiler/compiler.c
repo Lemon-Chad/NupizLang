@@ -578,6 +578,8 @@ static void method(Parser* parser) {
     if (isDefaultMethod) {
         if (identifierEquals(&parser->previous, "string")) {
             constant = DEFMTH_STRING;
+        } else if (identifierEquals(&parser->previous, "eq")) {
+            constant = DEFMTH_EQ;
         } else {
             error(parser, "Unknown default method.");
         }

@@ -58,7 +58,15 @@ ObjString* strValue(VM* vm, Value value) {
     }
 }
 
-bool valuesEqual(Value a, Value b)
+static bool eqInstance(VM* vm, ObjInstance* inst, Value other) {
+    NativeResult res = callDefaultMethod(vm, inst, DEFMTH_EQ, &other, 1);
+    if (res.success) {
+        return AS_BOOL(res.val);
+    }
+    return ((Obj*) inst) == AS_OBJ(other);
+}
+
+bool valuesEqual(VM* vm, Value a, Value b)
 {
     if (a.type != b.type) return false;
     switch (a.type) {
@@ -69,6 +77,9 @@ bool valuesEqual(Value a, Value b)
         case VAL_NUMBER:
             return AS_NUMBER(a) == AS_NUMBER(b);
         case VAL_OBJ: {
+            if (IS_INSTANCE(a))
+                return eqInstance(vm, AS_INSTANCE(a), b);
+            
             return AS_OBJ(a) == AS_OBJ(b);
         }
         default:

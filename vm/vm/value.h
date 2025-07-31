@@ -72,6 +72,6 @@ void writeValueArray(VM* vm, ValueArray* array, Value value);
 void freeValueArray(VM* vm, ValueArray* array);
 void printValue(Value value);
 ObjString* strValue(VM* vm, Value value);
-bool valuesEqual(Value a, Value b);
+bool valuesEqual(VM* vm, Value a, Value b);
 
 #endif

@@ -357,6 +357,9 @@ static void defineDefMethod(VM* vm, int idx) {
         case DEFMTH_STRING:
             name = formatString(vm, "string");
             break;
+        case DEFMTH_EQ:
+            name = formatString(vm, "eq");
+            break;
         default:
             runtimeError(vm, "Unkown default method '%d'.", idx);
             break;
@@ -438,13 +441,13 @@ InterpretResult run(VM* vm) {
             case OP_EQUAL: {
                 Value b = pop(vm);
                 Value a = pop(vm);
-                push(vm, BOOL_VAL(valuesEqual(a, b)));
+                push(vm, BOOL_VAL(valuesEqual(vm, a, b)));
                 break;
             }
             case OP_NOT_EQUAL: {
                 Value b = pop(vm);
                 Value a = pop(vm);
-                push(vm, BOOL_VAL(!valuesEqual(a, b)));
+                push(vm, BOOL_VAL(!valuesEqual(vm, a, b)));
                 break;
             }
             case OP_ADD:

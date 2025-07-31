@@ -569,9 +569,18 @@ static void synchronize(Parser* parser) {
 
 static void method(Parser* parser) {
     bool isDefaultMethod = false;
+    bool isPublic = true;
+    bool isStatic = false;
+
     uint8_t constant = 0;
     if (match(parser, TOKEN_DEF))
         isDefaultMethod = true;
+    if (match(parser, TOKEN_PRV) && !isDefaultMethod)
+        isPublic = false;
+    if (match(parser, TOKEN_PUB) && isPublic && !isDefaultMethod)
+        isPublic = true;
+    if (match(parser, TOKEN_STATIC) && !isDefaultMethod)
+        isStatic = true;
     
     consume(parser, TOKEN_IDENTIFIER, "Expected method name.");
 
@@ -591,6 +600,36 @@ static void method(Parser* parser) {
     function(parser, type);
     emitBytes(parser, OP_METHOD, isDefaultMethod ? 2 : 0);
     emitByte(parser, constant);
+    if (!isDefaultMethod)
+        emitBytes(parser, isPublic ? 1 : 0, isStatic ? 1 : 0);
+}
+
+static void declareAttribute(Parser* parser) {
+    bool isStatic = false;
+    bool isPublic = false;
+    bool isConstant = parser->previous.type == TOKEN_CONST;
+
+    if (match(parser, TOKEN_PUB))
+        isPublic = true;
+    // pub prv is illegal. If prv && pub, fail.
+    if (match(parser, TOKEN_PRV) && !isPublic)
+        isPublic = false;
+    if (match(parser, TOKEN_STATIC))
+        isStatic = true;
+    
+    consume(parser, TOKEN_IDENTIFIER, "Expected attribute name.");
+    uint8_t constant = identifierConstant(parser, &parser->previous);
+
+    if (match(parser, TOKEN_EQUAL))
+        expression(parser);
+    else
+        emitByte(parser, OP_NULL);
+
+    consume(parser, TOKEN_SEMICOLON, "Expected ';' after attribute declaration.");
+
+    emitBytes(parser, OP_ATTRIBUTE, constant);
+    emitBytes(parser, isConstant ? 1 : 0, isPublic ? 1 : 0);
+    emitByte(parser, isStatic ? 1 : 0);
 }
 
 static void builder(Parser* parser) {
@@ -722,6 +761,9 @@ static void classDeclaration(Parser* parser) {
             method(parser);
         } else if (match(parser, TOKEN_BUILD)) {
             builder(parser);
+        } else if (match(parser, TOKEN_LET) || match(parser, TOKEN_VAR) ||
+                match(parser, TOKEN_CONST)) {
+            declareAttribute(parser);
         } else {
             advance(parser);
             error(parser, "Expected field, method, or constructor.");

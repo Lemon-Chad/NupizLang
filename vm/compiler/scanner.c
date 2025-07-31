@@ -128,7 +128,6 @@ static TokenType identifierTokenType(Scanner* scanner) {
         case 'e': return checkKeyword(scanner, 1, 3, "lse", TOKEN_ELSE);
         case 'l': return checkKeyword(scanner, 1, 2, "et", TOKEN_LET);
         case 'r': return checkKeyword(scanner, 1, 5, "eturn", TOKEN_RETURN);
-        case 's': return checkKeyword(scanner, 1, 4, "uper", TOKEN_SUPER);
         case 'u': return checkKeyword(scanner, 1, 5, "npack", TOKEN_UNPACK);
         case 'v': return checkKeyword(scanner, 1, 2, "ar", TOKEN_VAR);
         case 'w': return checkKeyword(scanner, 1, 4, "hile", TOKEN_WHILE);
@@ -140,6 +139,7 @@ static TokenType identifierTokenType(Scanner* scanner) {
                     case 'u': return checkKeyword(scanner, 2, 3, "ild", TOKEN_BUILD);
                 }
             }
+            break;
         case 'c':
             if (scanner->current - scanner->start > 1) {
                 switch (scanner->start[1]) {
@@ -176,6 +176,23 @@ static TokenType identifierTokenType(Scanner* scanner) {
                     case 'u': return checkKeyword(scanner, 2, 2, "ll", TOKEN_NULL);
                 }
             }
+            break;
+        case 'p':
+            if (scanner->current - scanner->start > 1) {
+                switch (scanner->start[1]) {
+                    case 'r': return checkKeyword(scanner, 2, 1, "v", TOKEN_PRV);
+                    case 'u': return checkKeyword(scanner, 2, 1, "b", TOKEN_PUB);
+                }
+            }
+            break;
+        case 's': 
+            if (scanner->current - scanner->start > 1) {
+                switch (scanner->start[1]) {
+                    case 'u': return checkKeyword(scanner, 2, 3, "per", TOKEN_SUPER);
+                    case 't': return checkKeyword(scanner, 2, 4, "atic", TOKEN_STATIC);
+                }
+            }
+            break;
         case 't':
             if (scanner->current - scanner->start > 1) {
                 switch (scanner->start[1]) {
@@ -183,6 +200,7 @@ static TokenType identifierTokenType(Scanner* scanner) {
                     case 'r': return checkKeyword(scanner, 2, 2, "ue", TOKEN_TRUE);
                 }
             }
+            break;
     }
     return TOKEN_IDENTIFIER;
 }

@@ -53,6 +53,7 @@ typedef enum {
     OP_SET_INDEX,
     OP_IMPORT,
     OP_UNPACK,
+    OP_ATTRIBUTE,
 } OpCode;
 
 struct Chunk {

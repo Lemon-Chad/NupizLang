@@ -20,6 +20,7 @@
 #define IS_LIST(val) isObjType(val, OBJ_LIST)
 #define IS_NAMESPACE(val) isObjType(val, OBJ_NAMESPACE)
 #define IS_LIBRARY(val) isObjType(val, OBJ_LIBRARY)
+#define IS_ATTRIBUTE(val) isObjType(val, OBJ_ATTRIBUTE)
 
 #define AS_STRING(val) ((ObjString*) AS_OBJ(val))
 #define AS_CSTRING(val) (((ObjString*) AS_OBJ(val))->chars)
@@ -32,6 +33,7 @@
 #define AS_LIST(val) ((ObjList*) AS_OBJ(val))
 #define AS_NAMESPACE(val) ((ObjNamespace*) AS_OBJ(val))
 #define AS_LIBRARY(val) ((ObjLibrary*) AS_OBJ(val))
+#define AS_ATTRIBUTE(val) ((ObjAttribute*) AS_OBJ(val))
 
 typedef enum {
     OBJ_STRING,
@@ -45,6 +47,7 @@ typedef enum {
     OBJ_LIST,
     OBJ_NAMESPACE,
     OBJ_LIBRARY,
+    OBJ_ATTRIBUTE,
 } ObjType;
 
 struct Obj {
@@ -95,6 +98,8 @@ struct ObjClass {
     ObjString* name;
     ObjClosure* constructor;
     Table methods;
+    Table fields;
+    Table staticFields;
     ObjClosure* defaultMethods[DEFAULT_METHOD_COUNT];
 };
 
@@ -135,6 +140,14 @@ typedef struct {
     NativeFn function;
 } ObjNative;
 
+struct ObjAttribute {
+    Obj obj;
+    Value val;
+    bool isPublic;
+    bool isStatic;
+    bool isConstant;
+};
+
 ObjClosure* newClosure(VM* vm, ObjFunction* func);
 ObjFunction* newFunction(VM* vm);
 ObjNative* newNative(VM* vm, NativeFn func);
@@ -145,8 +158,30 @@ ObjList* newList(VM* vm);
 ObjNamespace* newNamespace(VM* vm, ObjString* name);
 ObjLibrary* newLibrary(VM* vm, ObjString* name, ImportLibrary init);
 
-bool writeNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value val, bool public);
+bool writeNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value val, bool isPublic);
 bool getNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value* ptr, bool internal);
+
+ObjAttribute* newAttribute(VM* vm, Value val, bool isPublic, bool isStatic, bool isConstant);
+ObjAttribute* copyAttribute(VM* vm, Value attr);
+
+bool declareClassField(VM* vm, ObjClass* clazz, ObjString* name, Value val,
+        bool isPublic, bool isStatic, bool isConstant);
+bool declareClassMethod(VM* vm, ObjClass* clazz, ObjString* name, Value val, bool isPublic, bool isStatic);
+
+bool setClassField(VM* vm, ObjClass* clazz, ObjString* name, Value val, bool internal);
+bool getClassField(VM* vm, ObjClass* clazz, ObjString* name, Value* ptr, bool internal);
+bool getClassMethod(VM* vm, ObjClass* clazz, ObjString* name, Value* ptr, bool internal);
+bool getInstanceClassMethod(VM* vm, ObjClass* clazz, ObjString* name, Value* ptr, bool internal);
+
+bool setInstanceField(VM* vm, ObjInstance* inst, ObjString* name, Value val, bool internal);
+bool getInstanceField(VM* vm, ObjInstance* inst, ObjString* name, Value* ptr, bool internal);
+bool getInstanceMethod(VM* vm, ObjInstance* inst, ObjString* name, Value* ptr, bool internal);
+
+bool hasClassField(VM* vm, ObjClass* clazz, ObjString* name, bool internal);
+bool hasClassMethod(VM* vm, ObjClass* clazz, ObjString* name, bool internal);
+bool hasInstanceClassMethod(VM* vm, ObjClass* clazz, ObjString* name, bool internal);
+bool hasInstanceField(VM* vm, ObjInstance* inst, ObjString* name, bool internal);
+bool hasInstanceMethod(VM* vm, ObjInstance* inst, ObjString* name, bool internal);
 
 static inline bool isObjType(Value val, ObjType type) {
     return IS_OBJ(val) && AS_OBJ(val)->type == type;

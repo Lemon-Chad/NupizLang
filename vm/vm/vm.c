@@ -18,6 +18,8 @@ static void resetStack(VM* vm) {
 }
 
 void runtimeError(VM* vm, const char* format, ...) {
+    if (vm->safeMode > 0) return;
+
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);
@@ -42,6 +44,7 @@ void initVM(VM* vm) {
     resetStack(vm);
     vm->objects = NULL;
     vm->compiler = NULL;
+    vm->safeMode = 0;
 
     initTable(&vm->globals);
     initTable(&vm->strings);
@@ -64,7 +67,7 @@ void freeVM(VM* vm) {
     freeTable(vm, &vm->strings);
 }
 
-static bool getBound(VM* vm, ObjString* name, bool safe) {
+static bool getBound(VM* vm, ObjString* name) {
     CallFrame* frame = &vm->frames[vm->frameCount - 1];
     if (IS_OBJ(frame->bound)) {
         switch (OBJ_TYPE(frame->bound)) {
@@ -72,14 +75,32 @@ static bool getBound(VM* vm, ObjString* name, bool safe) {
                 ObjInstance* inst = AS_INSTANCE(frame->bound);
 
                 Value val;
-                if (!tableGet(&inst->fields, name, &val)) {
-                    if (!safe)
-                        runtimeError(vm, "Undefined attribute '%s'.", name->chars);
-                    return false;
+                vm->safeMode++;
+                if (getInstanceField(vm, inst, name, &val, true) ||
+                        getInstanceMethod(vm, inst, name, &val, true)) {
+                    vm->safeMode--;
+                    push(vm, val);
+                    return true;
                 }
+                vm->safeMode--;
 
-                push(vm, val);
-                return true;
+                return false;
+            }
+
+            case OBJ_CLASS: {
+                ObjClass* clazz = AS_CLASS(frame->bound);
+
+                Value val;
+                vm->safeMode++;
+                if (getClassField(vm, clazz, name, &val, true) ||
+                        getClassMethod(vm, clazz, name, &val, true)) {
+                    vm->safeMode--;
+                    push(vm, val);
+                    return true;
+                }
+                vm->safeMode--;
+
+                return false;
             }
 
             case OBJ_NAMESPACE: {
@@ -87,8 +108,7 @@ static bool getBound(VM* vm, ObjString* name, bool safe) {
 
                 Value val;
                 if (!getNamespace(vm, namespace, name, &val, true)) {
-                    if (!safe)
-                        runtimeError(vm, "Undefined attribute '%s'.", name->chars);
+                    runtimeError(vm, "Undefined attribute '%s'.", name->chars);
                     return false;
                 }
 
@@ -101,33 +121,28 @@ static bool getBound(VM* vm, ObjString* name, bool safe) {
         }
     }
     
-    if (!safe)
-        runtimeError(vm, "Requesting attribute outside of class or instance context.");
+    runtimeError(vm, "Requesting attribute outside of class or instance context.");
     return false;
 }
 
-static bool setBound(VM* vm, ObjString* name, Value val, bool safe) {
+static bool setBound(VM* vm, ObjString* name, Value val) {
     CallFrame* frame = &vm->frames[vm->frameCount - 1];
     if (IS_OBJ(frame->bound)) {
         switch (OBJ_TYPE(frame->bound)) {
-            case OBJ_INSTANCE: {
-                ObjInstance* inst = AS_INSTANCE(frame->bound);
-
-                if (tableSet(vm, &inst->fields, name, val)) {
-                    tableDelete(&inst->fields, name);
-                    runtimeError(vm, "Undefined attribute '%s'.", name->chars);
-                    return false;
-                }
-                return true;
-            }
+            case OBJ_INSTANCE: 
+                return setInstanceField(vm, 
+                    AS_INSTANCE(frame->bound), name, val, true);
+            
+            case OBJ_CLASS: 
+                return setClassField(vm, 
+                    AS_CLASS(frame->bound), name, val, true);
             
             default:
                 break;
         }
     }
     
-    if (!safe)
-        runtimeError(vm, "Requesting attribute outside of class or instance context.");
+    runtimeError(vm, "Requesting attribute outside of class or instance context.");
     return false;
 }
 
@@ -203,8 +218,7 @@ static bool callValue(VM* vm, Value callee, int argc) {
 
 static bool invokeFromClass(VM* vm, ObjClass* clazz, ObjString* name, int argc, Value inst) {
     Value method;
-    if (!tableGet(&clazz->methods, name, &method)) {
-        runtimeError(vm, "Undefined property '%s'.", name->chars);
+    if (!getInstanceClassMethod(vm, clazz, name, &method, false)) {
         return false;
     }
 
@@ -222,12 +236,35 @@ static bool invoke(VM* vm, ObjString* name, int argc) {
             ObjInstance* inst = AS_INSTANCE(reciever);
 
             Value value;
-            if (tableGet(&inst->fields, name, &value)) {
+            vm->safeMode++;
+            if (getInstanceField(vm, inst, name, &value, false)) {
+                vm->safeMode--;
                 vm->stackTop[-argc - 1] = value;
                 return callValue(vm, value, argc);
             }
+            vm->safeMode--;
 
             return invokeFromClass(vm, inst->clazz, name, argc, reciever);
+        }
+
+        case OBJ_CLASS: {
+            ObjClass* clazz = AS_CLASS(reciever);
+
+            Value value;
+            vm->safeMode++;
+            if (getClassField(vm, clazz, name, &value, false)) {
+                vm->safeMode--;
+                vm->stackTop[-argc - 1] = value;
+                return callValue(vm, value, argc);
+            }
+            vm->safeMode--;
+
+            Value method;
+            if (!getClassMethod(vm, clazz, name, &method, false)) {
+                return false;
+            }
+
+            return call(vm, AS_CLOSURE(method), argc, reciever);
         }
 
         case OBJ_NAMESPACE: {
@@ -252,10 +289,9 @@ static bool invoke(VM* vm, ObjString* name, int argc) {
     }
 }
 
-static bool bindMethod(VM* vm, ObjClass* clazz, ObjString* name) {
+static bool bindMethod(VM* vm, ObjClass* clazz, ObjString* name, bool internal) {
     Value method;
-    if (!tableGet(&clazz->methods, name, &method)) {
-        runtimeError(vm, "Undefined property '%s'.", name->chars);
+    if (!getInstanceClassMethod(vm, clazz, name, &method, internal)) {
         return false;
     }
 
@@ -340,11 +376,23 @@ static void concatenate(VM* vm) {
     push(vm, OBJ_VAL(res));
 }
 
-static void defineMethod(VM* vm, ObjString* name) {
+static bool defineMethod(VM* vm, ObjString* name, bool isPublic, bool isStatic) {
     Value method = peek(vm, 0);
     ObjClass* clazz = AS_CLASS(peek(vm, 1));
-    tableSet(vm, &clazz->methods, name, method);
+    if (!declareClassMethod(vm, clazz, name, method, isPublic, isStatic))
+        return false;
     pop(vm);
+    return true;
+}
+
+static bool defineAttribute(VM* vm, ObjString* name, bool isConstant,
+        bool isPublic, bool isStatic) {
+    Value val = peek(vm, 0);
+    ObjClass* clazz = AS_CLASS(peek(vm, 1));
+    if (!declareClassField(vm, clazz, name, val, isPublic, isStatic, isConstant))
+        return false;
+    pop(vm);
+    return true;
 }
 
 static void defineDefMethod(VM* vm, int idx) {
@@ -364,7 +412,7 @@ static void defineDefMethod(VM* vm, int idx) {
             runtimeError(vm, "Unkown default method '%d'.", idx);
             break;
     }
-    tableSet(vm, &clazz->methods, name, method);
+    declareClassMethod(vm, clazz, name, method, true, false);
     
     pop(vm);
 }
@@ -500,8 +548,12 @@ InterpretResult run(VM* vm) {
             case OP_SET_GLOBAL: {
                 ObjString* name = READ_STRING();
 
-                if (setBound(vm, name, peek(vm, 0), true))
+                vm->safeMode++;
+                if (setBound(vm, name, peek(vm, 0))) {
+                    vm->safeMode--;
                     break;
+                }
+                vm->safeMode--;
                 
                 if (tableSet(vm, &vm->globals, name, peek(vm, 0))) {
                     tableDelete(&vm->globals, name);
@@ -515,8 +567,12 @@ InterpretResult run(VM* vm) {
                 ObjString* name = READ_STRING();
                 Value val;
 
-                if (getBound(vm, name, true))
+                vm->safeMode++;
+                if (getBound(vm, name)) {
+                    vm->safeMode--;
                     break;
+                }
+                vm->safeMode--;
                 
                 if (!tableGet(&vm->globals, name, &val)) {
                     runtimeError(vm, "Global variable '%s' is undefined.", name->chars);
@@ -635,17 +691,43 @@ InterpretResult run(VM* vm) {
                         ObjInstance* inst = AS_INSTANCE(accessed);
 
                         Value val;
-                        if (tableGet(&inst->fields, name, &val)) {
+                        vm->safeMode++;
+                        if (getInstanceField(vm, inst, name, &val, false)) {
+                            vm->safeMode--;
                             pop(vm);
                             push(vm, val);
                             break;
                         }
+                        vm->safeMode--;
 
-                        if (!bindMethod(vm, inst->clazz, name)) {
+                        if (!bindMethod(vm, inst->clazz, name, false)) {
                             return INTERPRET_RUNTIME_ERR;
                         }
 
                         break;
+                    }
+
+                    case OBJ_CLASS: {
+                        ObjClass* clazz = AS_CLASS(accessed);
+
+                        Value val;
+                        vm->safeMode++;
+                        if (getClassField(vm, clazz, name, &val, false)) {
+                            vm->safeMode--;
+                            pop(vm);
+                            push(vm, val);
+                            break;
+                        }
+                        vm->safeMode--;
+                        
+                        if (getClassMethod(vm, clazz, name, &val, false)) {
+                            ObjBoundMethod* boundMethod = newBoundMethod(vm, peek(vm, 0), AS_CLOSURE(val));
+                            pop(vm);
+                            push(vm, OBJ_VAL(boundMethod));
+                            break;
+                        }
+
+                        return INTERPRET_RUNTIME_ERR;
                     }
 
                     case OBJ_NAMESPACE: {
@@ -680,7 +762,9 @@ InterpretResult run(VM* vm) {
                 }
 
                 ObjInstance* inst = AS_INSTANCE(peek(vm, 1));
-                tableSet(vm, &inst->fields, READ_STRING(), peek(vm, 0));
+                if (!setInstanceField(vm, inst, READ_STRING(), peek(vm, 0), false))
+                    return INTERPRET_RUNTIME_ERR;
+                
                 Value val = pop(vm);
                 pop(vm);
                 push(vm, val);
@@ -694,10 +778,18 @@ InterpretResult run(VM* vm) {
                 } else if (methodType == 2) {
                     defineDefMethod(vm, READ_BYTE());
                 } else {
-                    defineMethod(vm, READ_STRING());
+                    if (!defineMethod(vm, READ_STRING(), 
+                            READ_BYTE() == 1, READ_BYTE() == 1))
+                        return INTERPRET_RUNTIME_ERR;
                 }
                 break;
             }
+
+            case OP_ATTRIBUTE:
+                if (!defineAttribute(vm, READ_STRING(), READ_BYTE() == 1, 
+                        READ_BYTE() == 1, READ_BYTE() == 1))
+                    return INTERPRET_RUNTIME_ERR;
+                break;
 
             case OP_INVOKE: {
                 ObjString* method = READ_STRING();
@@ -721,6 +813,7 @@ InterpretResult run(VM* vm) {
                 ObjClass* superclass = AS_CLASS(val);
 
                 tableAddAll(vm, &superclass->methods, &subclass->methods);
+                tableAddAll(vm, &superclass->fields, &subclass->fields);
                 for (int i = 0; i < DEFAULT_METHOD_COUNT; i++)
                     subclass->defaultMethods[i] = superclass->defaultMethods[i];    
 
@@ -732,7 +825,7 @@ InterpretResult run(VM* vm) {
                 ObjString* name = READ_STRING();
                 ObjClass* superclass = AS_CLASS(pop(vm));
                 
-                if (!bindMethod(vm, superclass, name)) {
+                if (!bindMethod(vm, superclass, name, false)) {
                     return INTERPRET_RUNTIME_ERR;
                 }
                 break;
@@ -832,7 +925,6 @@ InterpretResult run(VM* vm) {
                 switch (OBJ_TYPE(op)) {
                     case OBJ_NAMESPACE: {
                         tableAddAll(vm, &AS_NAMESPACE(op)->publics, &vm->globals);
-                        pop(vm);
                         break;
                     }
 

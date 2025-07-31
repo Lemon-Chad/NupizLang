@@ -89,6 +89,13 @@ ObjInstance* newInstance(VM* vm, ObjClass* clazz) {
     ObjInstance* inst = ALLOCATE_OBJ(vm, ObjInstance, OBJ_INSTANCE);
     inst->clazz = clazz;
     initTable(&inst->fields);
+    for (int i = 0; i < clazz->fields.capacity; i++) {
+        Entry* entry = &clazz->fields.entries[i];
+        if (entry->key == NULL)
+            continue;
+        
+        tableSet(vm, &inst->fields, entry->key, OBJ_VAL(copyAttribute(vm, entry->value)));
+    }
     return inst;
 }
 
@@ -115,9 +122,9 @@ ObjNamespace* newNamespace(VM* vm, ObjString* name) {
     return namespace;
 }
 
-bool writeNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value val, bool public) {
+bool writeNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value val, bool isPublic) {
     bool newKey = tableSet(vm, &namespace->values, name, val);
-    if (public)
+    if (isPublic)
         tableSet(vm, &namespace->publics, name, val);
     return newKey;
 }
@@ -240,6 +247,8 @@ ObjString* strObject(VM* vm, Value val) {
             return formatString(vm, "<namespace '%s'>", AS_NAMESPACE(val)->name->chars);
         case OBJ_LIBRARY:
             return formatString(vm, "<library '%s'>", AS_LIBRARY(val)->name->chars);
+        case OBJ_ATTRIBUTE:
+            return formatString(vm, "attr");
     }
     return formatString(vm, "undefined");
 }
@@ -281,8 +290,196 @@ void printObject(Value val) {
         case OBJ_LIBRARY:
             printf("<library %s>", AS_LIBRARY(val)->name->chars);
             break;
+        case OBJ_ATTRIBUTE:
+            printf("attr");
+            break;
         default:
             printf("undefined");
             break;
     }
+}
+
+ObjAttribute* newAttribute(VM* vm, Value val, bool isPublic, bool isStatic, bool isConstant) {
+    ObjAttribute* attr = ALLOCATE_OBJ(vm, ObjAttribute, OBJ_ATTRIBUTE);
+
+    attr->val = val;
+    attr->isPublic = isPublic;
+    attr->isStatic = isStatic;
+    attr->isConstant = isConstant;
+
+    return attr;
+}
+
+ObjAttribute* copyAttribute(VM* vm, Value attr) {
+    ObjAttribute* prev = AS_ATTRIBUTE(attr);
+    return newAttribute(vm, prev->val, prev->isPublic, prev->isStatic, prev->isConstant);
+}
+
+bool declareClassField(VM* vm, ObjClass* clazz, ObjString* name, Value val, 
+        bool isPublic, bool isStatic, bool isConstant) {
+    ObjAttribute* attr = newAttribute(vm, val, isPublic, isStatic, isConstant);
+    Table* tb = isStatic ? &clazz->staticFields : &clazz->fields;
+    if (!tableSet(vm, tb, name, OBJ_VAL(attr))) {
+        runtimeError(vm, "Attribute '%s' is already defined on class '%s'.", name->chars, clazz->name->chars);
+        return false;
+    }
+    return true;
+}
+
+bool declareClassMethod(VM* vm, ObjClass* clazz, ObjString* name, Value val, bool isPublic, bool isStatic) {
+    ObjAttribute* attr = newAttribute(vm, val, isPublic, isStatic, true);
+    if (!tableSet(vm, &clazz->methods, name, OBJ_VAL(attr))) {
+        runtimeError(vm, "Method '%s' is already defined on class '%s'.", name->chars, clazz->name->chars);
+        return false;
+    }
+    return true;
+}
+
+bool setClassField(VM* vm, ObjClass* clazz, ObjString* name, Value val, bool internal) {
+    Value attrVal;
+    if (!tableGet(&clazz->staticFields, name, &attrVal)) {
+        runtimeError(vm, "Attribute '%s' is not defined on class '%s'.", name->chars, clazz->name->chars);
+        return false;
+    }
+
+    ObjAttribute* attr = AS_ATTRIBUTE(attrVal);
+    if (!(attr->isPublic || internal) || attr->isConstant) {
+        runtimeError(vm, "Attribute '%s' cannot be modified from this context.", name->chars);
+        return false;
+    }
+
+    attr->val = val;
+    return true;
+}
+
+bool getClassField(VM* vm, ObjClass* clazz, ObjString* name, Value* ptr, bool internal) {
+    Value attrVal;
+    if (!tableGet(&clazz->staticFields, name, &attrVal)) {
+        runtimeError(vm, "Attribute '%s' is not defined on class '%s'.", name->chars, clazz->name->chars);
+        return false;
+    }
+
+    ObjAttribute* attr = AS_ATTRIBUTE(attrVal);
+    if (!(attr->isPublic || internal)) {
+        runtimeError(vm, "Attribute '%s' cannot be accessed from this context.", name->chars);
+        return false;
+    }
+
+    *ptr = attr->val;
+    return true;
+}
+
+bool getClassMethod(VM* vm, ObjClass* clazz, ObjString* name, Value* ptr, bool internal) {
+    Value attrVal;
+    if (!tableGet(&clazz->methods, name, &attrVal) || !AS_ATTRIBUTE(attrVal)->isStatic) {
+        runtimeError(vm, "Method '%s' is not defined on class '%s'.", name->chars, clazz->name->chars);
+        return false;
+    }
+
+    ObjAttribute* attr = AS_ATTRIBUTE(attrVal);
+    if (!(attr->isPublic || internal)) {
+        runtimeError(vm, "Method '%s' cannot be accessed from this context.", name->chars);
+        return false;
+    }
+
+    *ptr = attr->val;
+    return true;
+}
+
+bool getInstanceClassMethod(VM* vm, ObjClass* clazz, ObjString* name, Value* ptr, bool internal) {
+    Value attrVal;
+    if (!tableGet(&clazz->methods, name, &attrVal) || AS_ATTRIBUTE(attrVal)->isStatic) {
+        runtimeError(vm, "Method '%s' is not defined on class '%s'.", name->chars, clazz->name->chars);
+        return false;
+    }
+
+    ObjAttribute* attr = AS_ATTRIBUTE(attrVal);
+    if (!(attr->isPublic || internal)) {
+        runtimeError(vm, "Method '%s' cannot be accessed from this context.", name->chars);
+        return false;
+    }
+
+    *ptr = attr->val;
+    return true;
+}
+
+bool setInstanceField(VM* vm, ObjInstance* inst, ObjString* name, Value val, bool internal) {
+    Value attrVal;
+    if (!tableGet(&inst->fields, name, &attrVal)) {
+        runtimeError(vm, "Attribute '%s' is not defined on instance of class '%s'.", name->chars, inst->clazz->name->chars);
+        return false;
+    }
+
+    ObjAttribute* attr = AS_ATTRIBUTE(attrVal);
+    if (!(attr->isPublic || internal) || attr->isConstant) {
+        runtimeError(vm, "Attribute '%s' cannot be modified from this context.", name->chars);
+        return false;
+    }
+
+    attr->val = val;
+    return true;
+}
+
+bool getInstanceField(VM* vm, ObjInstance* inst, ObjString* name, Value* ptr, bool internal) {
+    Value attrVal;
+    if (!tableGet(&inst->fields, name, &attrVal)) {
+        runtimeError(vm, "Attribute '%s' is not defined on instance of class '%s'.", name->chars, inst->clazz->name->chars);
+        return false;
+    }
+
+    ObjAttribute* attr = AS_ATTRIBUTE(attrVal);
+    if (!(attr->isPublic || internal)) {
+        runtimeError(vm, "Attribute '%s' cannot be accessed from this context.", name->chars);
+        return false;
+    }
+
+    *ptr = attr->val;
+    return true;
+}
+
+bool getInstanceMethod(VM* vm, ObjInstance* inst, ObjString* name, Value* ptr, bool internal) {
+    Value attrVal;
+    if (!tableGet(&inst->clazz->methods, name, &attrVal) || AS_ATTRIBUTE(attrVal)->isStatic) {
+        runtimeError(vm, "Method '%s' is not defined on instance of class '%s'.", name->chars, inst->clazz->name->chars);
+        return false;
+    }
+
+    ObjAttribute* attr = AS_ATTRIBUTE(attrVal);
+    if (!(attr->isPublic || internal)) {
+        runtimeError(vm, "Attribute '%s' cannot be accessed from this context.", name->chars);
+        return false;
+    }
+
+    *ptr = attr->val;
+    return true;
+}
+
+bool hasClassField(VM* vm, ObjClass* clazz, ObjString* name, bool internal) {
+    Value ptr;
+    return tableGet(&clazz->staticFields, name, &ptr) && 
+        (AS_ATTRIBUTE(ptr)->isPublic || internal);
+}
+
+bool hasClassMethod(VM* vm, ObjClass* clazz, ObjString* name, bool internal) {
+    Value ptr;
+    return tableGet(&clazz->methods, name, &ptr) && 
+        (AS_ATTRIBUTE(ptr)->isPublic || internal) && AS_ATTRIBUTE(ptr)->isStatic;
+}
+
+bool hasInstanceClassMethod(VM* vm, ObjClass* clazz, ObjString* name, bool internal) {
+    Value ptr;
+    return tableGet(&clazz->methods, name, &ptr) && 
+        (AS_ATTRIBUTE(ptr)->isPublic || internal) && !AS_ATTRIBUTE(ptr)->isStatic;
+}
+
+bool hasInstanceField(VM* vm, ObjInstance* inst, ObjString* name, bool internal) {
+    Value ptr;
+    return tableGet(&inst->fields, name, &ptr) && 
+        (AS_ATTRIBUTE(ptr)->isPublic || internal);
+}
+
+bool hasInstanceMethod(VM* vm, ObjInstance* inst, ObjString* name, bool internal) {
+    Value ptr;
+    return tableGet(&inst->clazz->methods, name, &ptr) && 
+        (AS_ATTRIBUTE(ptr)->isPublic || internal) && !AS_ATTRIBUTE(ptr)->isStatic;
 }

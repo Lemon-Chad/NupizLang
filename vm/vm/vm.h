@@ -50,7 +50,7 @@ struct VM {
 
     Table libraries;
 
-    bool safeMode;
+    int safeMode;
 };
 
 typedef enum {

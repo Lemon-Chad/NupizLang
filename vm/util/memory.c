@@ -101,6 +101,10 @@ static void freeObject(VM* vm, Obj* obj) {
         case OBJ_LIBRARY:
             FREE(vm, ObjLibrary, obj);
             break;
+        
+        case OBJ_ATTRIBUTE:
+            FREE(vm, ObjAttribute, obj);
+            break;
     }
 }
 
@@ -247,6 +251,12 @@ static void blackenObject(VM* vm, Obj* obj) {
             markObject(vm, (Obj*) library->name);
             if (library->imported)
                 markObject(vm, (Obj*) library->namespace);
+            break;
+        }
+
+        case OBJ_ATTRIBUTE: {
+            ObjAttribute* attr = (ObjAttribute*) obj;
+            markValue(vm, attr->val);
             break;
         }
 

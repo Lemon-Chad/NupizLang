@@ -123,7 +123,24 @@ int disassembleInstruction(Chunk* chunk, int offset) {
         CONST_INST(OP_SET_PROPERTY);
         CONST_INST(OP_GET_SUPER);
 
+        case OP_ATTRIBUTE: {
+            offset++;
+            
+            uint8_t constant = chunk->code[offset++];
+            bool isConstant = chunk->code[offset++] == 1;
+            bool isPublic = chunk->code[offset++] == 1;
+            bool isStatic = chunk->code[offset++] == 1;
+            printf("%-16s %4d %s%s%s '", "OP_ATTRIBUTE", constant, 
+                isConstant ? "const " : "", isPublic ? "pub": "prv", 
+                isStatic ? " static" : "");
+            printValue(chunk->constants.values[constant]);
+            printf("'\n");
+            return offset;
+        }
+
         case OP_METHOD: {
+            offset++;
+
             int methodType = chunk->code[offset++];
             if (methodType == 1) {
                 printf("%-16s INITIALIZER\n", "OP_METHOD");
@@ -132,7 +149,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
                 printf("%-16s %4d DEFAULT\n", "OP_METHOD", defMethodIdx);
             } else {
                 uint8_t constant = chunk->code[offset++];
-                printf("%-16s %4d '", "OP_METHOD", constant);
+                bool isPublic = chunk->code[offset++] == 1;
+                bool isStatic = chunk->code[offset++] == 1;
+                printf("%-16s %4d %s%s '", "OP_METHOD", constant, 
+                    isPublic ? "pub": "prv", isStatic ? " static" : "");
                 printValue(chunk->constants.values[constant]);
                 printf("'\n");
             }

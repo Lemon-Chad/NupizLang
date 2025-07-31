@@ -17,6 +17,7 @@ typedef struct ObjBoundMethod ObjBoundMethod;
 typedef struct ObjList ObjList;
 typedef struct ObjNamespace ObjNamespace;
 typedef struct ObjLibrary ObjLibrary;
+typedef struct ObjAttribute ObjAttribute;
 
 typedef struct VM VM;
 typedef struct Chunk Chunk;

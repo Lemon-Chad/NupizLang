@@ -6,6 +6,16 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef WIN32
+#include <io.h>
+#define F_OK 0
+#define access _access
+#endif
+
+#ifndef WIN32
+#include <unistd.h>
+#endif
+
 //#define DEBUG_PRINT_DUMPER
 //#define DEBUG_PRINT_LOADER
 

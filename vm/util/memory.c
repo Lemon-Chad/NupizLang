@@ -1,4 +1,6 @@
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "../vm/object.h"
 #include "memory.h"
@@ -32,7 +34,8 @@ void* reallocate(VM* vm, void* ptr, size_t oldSize, size_t newSize) {
 
 static void freeObject(VM* vm, Obj* obj) {
     #ifdef DEBUG_SLOG_GC
-        printf("%p free type %d\n", (void*) obj, obj->type);
+        printObject(OBJ_VAL(obj));
+        printf(": %p free type %d\n", (void*) obj, obj->type);
     #endif
 
     switch (obj->type) {
@@ -296,6 +299,9 @@ static void sweep(VM* vm) {
 }
 
 void collectGarbage(VM* vm) {
+    if (vm->pauseGC > 0)
+        return;
+    
     #ifdef DEBUG_LOG_GC
         printf("-- gc begin\n");
 
@@ -315,4 +321,50 @@ void collectGarbage(VM* vm) {
             before - vm->bytesAllocated, before, vm->bytesAllocated, vm->nextGC);
     #endif
     
+}
+
+char* readFile(char* path) {
+    FILE* fp = fopen(path, "rb");
+    if (fp == NULL) {
+        fprintf(stderr, "Could not open file \"%s\".\n", path);
+        exit(74);
+    }
+
+    fseek(fp, 0, SEEK_END);
+    size_t len = ftell(fp);
+    rewind(fp);
+
+    char* buf = (char*) malloc(len + 1);
+    if (buf == NULL) {
+        fprintf(stderr, "Not enough memory to read \"%s\".\n", path);
+        exit(74);
+    }
+    size_t bytesRead = fread(buf, sizeof(char), len, fp);
+    if (bytesRead < len) {
+        fprintf(stderr, "Could not read file \"%s\".\n", path);
+        exit(74);
+    }
+    buf[bytesRead] = '\0';
+
+    fclose(fp);
+    fp = NULL;
+    return buf;
+}
+
+char* getDirectory(char* path) {
+    int length = 0;
+    for (int i = 0; i < strlen(path); i++)
+        if (path[i] == '/' || path[i] == '\\')
+            length = i;
+    
+    char* newPath = malloc(length + 1);
+    memcpy(newPath, path, length);
+    newPath[length] = '\0';
+    return newPath;
+}
+
+void changeDirectory(char* path) {
+    path = getDirectory(path);
+    chdir(path);
+    free(path);
 }

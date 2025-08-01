@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 
 #include "memory.h"
@@ -17,6 +18,20 @@ void freeTable(VM* vm, Table* tb) {
     initTable(tb);
 }
 
+static void printEntries(Entry* entries, int capacity) {
+    printf("{ ");
+    for (int i = 0; i < capacity; i++) {
+        Entry* entry = &entries[i];
+        if (entry->key == NULL)
+            continue;
+        
+        printf("(\"%s\"[%d] -> ", entry->key->chars, i);
+        printValue(entry->value);
+        printf(") ");
+    }
+    printf("}");
+}
+
 static Entry* findEntry(Entry* entries, int capacity, ObjString* key) {
     uint32_t idx = key->hash & (capacity - 1);
     Entry* tombstone = NULL;
@@ -28,7 +43,8 @@ static Entry* findEntry(Entry* entries, int capacity, ObjString* key) {
                 return tombstone != NULL ? tombstone : entry;
             if (tombstone == NULL)
                 tombstone = entry;
-        } else if (entry->key == key) {
+        } else if (key->length == entry->key->length && 
+                memcmp(entry->key->chars, key->chars, key->length) == 0) {
             return entry;
         }
         
@@ -136,4 +152,18 @@ bool tableDelete(Table* tb, ObjString* key) {
     entry->key = NULL;
     entry->value = BOOL_VAL(true);
     return true;
+}
+
+void printTable(Table* tb) {
+    printf("{ ");
+    for (int i = 0; i < tb->capacity; i++) {
+        Entry* entry = &tb->entries[i];
+        if (entry->key == NULL)
+            continue;
+        
+        printf("(\"%s\"[%d] -> ", entry->key->chars, i);
+        printValue(entry->value);
+        printf(") ");
+    }
+    printf("}");
 }

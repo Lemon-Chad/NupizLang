@@ -11,6 +11,8 @@
 #include "compiler/dumper.h"
 #include "vm/loader.h"
 
+#include "util/memory.h"
+
 #define FLAG_COMPILE        0b00001
 #define FLAG_HELP           0b00010
 #define FLAG_VERSION        0b00100
@@ -36,34 +38,6 @@ static void repl(VM* vm) {
     }
 }
 */
-
-static char* readFile(char* path) {
-    FILE* fp = fopen(path, "rb");
-    if (fp == NULL) {
-        fprintf(stderr, "Could not open file \"%s\".\n", path);
-        exit(74);
-    }
-
-    fseek(fp, 0, SEEK_END);
-    size_t len = ftell(fp);
-    rewind(fp);
-
-    char* buf = (char*) malloc(len + 1);
-    if (buf == NULL) {
-        fprintf(stderr, "Not enough memory to read \"%s\".\n", path);
-        exit(74);
-    }
-    size_t bytesRead = fread(buf, sizeof(char), len, fp);
-    if (bytesRead < len) {
-        fprintf(stderr, "Could not read file \"%s\".\n", path);
-        exit(74);
-    }
-    buf[bytesRead] = '\0';
-
-    fclose(fp);
-    fp = NULL;
-    return buf;
-}
 
 static uint8_t* readFileBytes(char* path, size_t* length) {
     FILE* fp = fopen(path, "rb");
@@ -115,9 +89,11 @@ static ObjFunction* loadFile(VM* vm, char* path) {
     size_t length = 0;
     uint8_t* src = readFileBytes(path, &length);
 
+    vm->pauseGC++;
     BytecodeLoader* loader = newLoader(vm, src, length);
     ObjFunction* func = readBytecode(loader);
     freeLoader(vm, loader);
+    vm->pauseGC--;
 
     return func;
 }
@@ -214,10 +190,12 @@ int main(int argc, const char* argv[]) {
             exit(2);
         }
 
+        changeDirectory(compileTarget);
         compileFile(&vm, compileTarget, outputTarget);
     }
 
     if (HAS_FLAG(flags, FLAG_RUN)) {
+        changeDirectory(runTarget);
         runFile(&vm, runTarget);
     }
     

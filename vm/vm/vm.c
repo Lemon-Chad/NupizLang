@@ -45,6 +45,7 @@ void initVM(VM* vm) {
     vm->objects = NULL;
     vm->compiler = NULL;
     vm->safeMode = 0;
+    vm->pauseGC = 0;
 
     initTable(&vm->globals);
     initTable(&vm->strings);
@@ -65,6 +66,11 @@ void freeVM(VM* vm) {
 
     freeTable(vm, &vm->globals);
     freeTable(vm, &vm->strings);
+}
+
+void decoupleVM(VM* vm) {
+    freeTable(vm, &vm->globals);
+    freeTable(vm, &vm->strings);   
 }
 
 static bool getBound(VM* vm, ObjString* name) {
@@ -136,6 +142,18 @@ static bool setBound(VM* vm, ObjString* name, Value val) {
             case OBJ_CLASS: 
                 return setClassField(vm, 
                     AS_CLASS(frame->bound), name, val, true);
+            
+            case OBJ_NAMESPACE: {
+                ObjNamespace* namespace = AS_NAMESPACE(frame->bound);
+
+                if (!writeNamespace(vm, namespace, name, val, true)) {
+                    runtimeError(vm, "Undefined attribute '%s'.", name->chars);
+                    return false;
+                }
+
+                push(vm, val);
+                return true;
+            }
             
             default:
                 break;
@@ -912,6 +930,31 @@ InterpretResult run(VM* vm) {
                 tableGet(&vm->libraries, lib, &libVal);
                 
                 push(vm, OBJ_VAL(AS_LIBRARY(libVal)->namespace));
+                break;
+            }
+
+            case OP_IMPORT_FILE: {
+                ObjFunction* func = AS_FUNCTION(peek(vm, 0));
+                ObjString* filename = AS_STRING(peek(vm, 1));
+
+                VM temp;
+                initVM(&temp);
+
+                runFunc(&temp, func);
+
+                ObjNamespace* namespace = newNamespace(vm, filename);
+                vm->stackTop[-2] = OBJ_VAL(namespace);
+
+                for (int i = 0; i < temp.globals.capacity; i++) {
+                    Entry* entry = &temp.globals.entries[i];
+                    if (entry->key == NULL)
+                        continue;
+                    writeNamespace(vm, namespace, entry->key, entry->value, true);
+                }
+
+                decoupleVM(&temp);
+                
+                pop(vm);
                 break;
             }
 

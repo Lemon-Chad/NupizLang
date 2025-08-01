@@ -29,4 +29,8 @@ void markTable(VM* vm, Table* tb);
 void markCompilerRoots(VM* vm, Compiler* compiler);
 void collectGarbage(VM* vm);
 
+char* readFile(char* path);
+char* getDirectory(char* path);
+void changeDirectory(char* path);
+
 #endif

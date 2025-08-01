@@ -191,6 +191,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
         BYTE_INST(OP_SET_UPVALUE);
 
         CONST_INST(OP_IMPORT);
+        SIMPLE_INST(OP_IMPORT_FILE);
         SIMPLE_INST(OP_UNPACK);
         
         default:

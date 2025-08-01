@@ -14,6 +14,7 @@ typedef enum {
     DUMP_STRING,
     DUMP_FUNC,
     DUMP_CHUNK,
+    DUMP_NAMESPACE,
 } DumpCode;
 
 struct DumpedBytes {

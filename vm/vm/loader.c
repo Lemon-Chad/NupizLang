@@ -67,6 +67,7 @@ void freeLoader(VM* vm, BytecodeLoader* loader) {
 
 static ObjFunction* readFunction(BytecodeLoader* loader);
 static ObjString* readString(BytecodeLoader* loader);
+static ObjNamespace* readNamespace(BytecodeLoader* loader);
 
 static bool readBool(BytecodeLoader* loader) {
     consume(loader, DUMP_BOOL);
@@ -93,6 +94,8 @@ static Value readValue(BytecodeLoader* loader) {
             return OBJ_VAL((Obj*) readString(loader));
         case DUMP_FUNC:
             return OBJ_VAL((Obj*) readFunction(loader));
+        case DUMP_NAMESPACE:
+            return OBJ_VAL((Obj*) readNamespace(loader));
         default:
             fprintf(stderr, "Malformed bytecode, expected type byte, got '%04u'.\n", 
                 loader->byte);
@@ -216,6 +219,25 @@ static ObjFunction* readFunction(BytecodeLoader* loader) {
     func->upvalueCount = upvalues;
 
     return func;
+}
+
+static ObjNamespace* readNamespace(BytecodeLoader* loader) {
+    consume(loader, DUMP_NAMESPACE);
+
+    ObjString* name = readString(loader);
+    ObjNamespace* namespace = newNamespace(loader->vm, name);
+
+    int length = readInt(loader);
+    printf("len: %d\n", length);
+    for (int i = 0; i < length; i++) {
+        ObjString* key = readString(loader);
+        Value val = readValue(loader);
+        bool public = advance(loader) == 1;
+        
+        writeNamespace(loader->vm, namespace, key, val, public);
+    }
+
+    return namespace;
 }
 
 ObjFunction* readBytecode(BytecodeLoader* loader) {

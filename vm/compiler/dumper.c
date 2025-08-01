@@ -51,6 +51,28 @@ static void writeObject(VM* vm, DumpedBytes* bytes, Obj* obj) {
             takeBytes(vm, bytes, dumpFunction(vm, (ObjFunction*) obj));
             break;
         
+        case OBJ_UPVALUE:
+            takeBytes(vm, bytes, dumpValue(vm, ((ObjUpvalue*) obj)->closed));
+            break;
+        
+        case OBJ_NAMESPACE: {
+            ObjNamespace* namespace = (ObjNamespace*) obj;
+            writeByte(vm, bytes, DUMP_NAMESPACE);
+            writeObject(vm, bytes, (Obj*) namespace->name);
+            writeInt(vm, bytes, namespace->values.count);
+            for (int i = 0; i < namespace->values.capacity; i++) {
+                Entry* entry = &namespace->values.entries[i];
+                if (entry->key == NULL)
+                    continue;
+                
+                writeObject(vm, bytes, (Obj*) entry->key);
+                takeBytes(vm, bytes, dumpValue(vm, entry->value));
+                writeByte(vm, bytes, 
+                    tableGet(&namespace->publics, entry->key, NULL) ? 1 : 0);
+            }
+            break;
+        }
+        
         default:
             fprintf(stderr, "Unhandled type '%d'.\n", obj->type);
             exit(2);

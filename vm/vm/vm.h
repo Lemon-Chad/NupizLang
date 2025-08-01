@@ -51,6 +51,7 @@ struct VM {
     Table libraries;
 
     int safeMode;
+    int pauseGC;
 };
 
 typedef enum {
@@ -61,6 +62,7 @@ typedef enum {
 
 void initVM(VM* vm);
 void freeVM(VM* vm);
+void decoupleVM(VM* vm);
 
 InterpretResult runFuncBound(VM* vm, ObjFunction* func, Value binder);
 InterpretResult runFunc(VM* vm, ObjFunction* func);

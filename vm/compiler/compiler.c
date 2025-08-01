@@ -982,7 +982,32 @@ static void grouping(Parser* parser, bool canAssign) {
     consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after expression.");
 }
 
+static void importFile(Parser* parser) {
+    ObjString* filename = copyString(parser->vm, parser->previous.start + 1, parser->previous.length - 2);
+    emitConstant(parser, OBJ_VAL(filename));
+
+    char* src = readFile(filename->chars);
+
+    VM temp;
+
+    initVM(&temp);
+    ObjFunction* func = compile(&temp, src);
+    decoupleVM(&temp);
+
+    if (func == NULL) {
+        error(parser, "Failed to import file.");
+        return;
+    }
+    
+    emitConstant(parser, OBJ_VAL(func));
+    emitByte(parser, OP_IMPORT_FILE);
+}
+
 static void import(Parser* parser, bool canAssign) {
+    if (match(parser, TOKEN_STRING)) {
+        importFile(parser);
+        return;
+    }
     consume(parser, TOKEN_IDENTIFIER, "Expected library name after 'import'.");
 
     uint8_t constant = identifierConstant(parser, &parser->previous);

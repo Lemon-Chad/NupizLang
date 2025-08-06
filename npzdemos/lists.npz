@@ -1,10 +1,11 @@
+import std;
 
 func listString(lst) {
   let s = "[";
-  let n = length(lst);
+  let n = std.length(lst);
 
-  for (let i = 0; i < length(lst); i = i + 1) {
-    s = s + asString(lst[i]);
+  for (let i = 0; i < std.length(lst); i = i + 1) {
+    s = s + std.asString(lst[i]);
     if (i < n - 1)
       s = s + ", ";
   }
@@ -14,21 +15,21 @@ func listString(lst) {
 
 // Creating lists
 let list = [1, 2, 3, 4, 5];
-println(listString(list));
+std.println(listString(list));
 
 // Setting indices
 list[2] = 17;
-println(listString(list));
+std.println(listString(list));
 
 // Appending
-append(list, "hello!");
-println(listString(list));
+std.append(list, "hello!");
+std.println(listString(list));
 
 // Removing
 remove(list, 1);
-println(listString(list));
+std.println(listString(list));
 
 // Popping
-println(pop(list));
-println(listString(list));
+std.println(std.pop(list));
+std.println(listString(list));
 

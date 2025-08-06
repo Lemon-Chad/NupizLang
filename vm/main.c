@@ -170,13 +170,13 @@ int main(int argc, const char* argv[]) {
     }
 
     if (HAS_FLAG(flags, FLAG_HELP)) {
-        printf("Usage: npz [options] [target]\n");
+        printf("Usage: npz [options]\n");
         printf("Options:\n");
         printf("  -c [target]\t\tCompile target\n");
         printf("  -o [target]\t\tOutput target to file\n");
         printf("  -r [target]\t\tRuns the target compiled file\n");
-        printf("  -v [target]\t\tPrint version\n");
-        printf("  -h [target]\t\tPrint this help message\n");
+        printf("  -v\t\tPrint version\n");
+        printf("  -h\t\tPrint this help message\n");
     }
 
     if (HAS_FLAG(flags, FLAG_VERSION)) {

@@ -1,17 +1,39 @@
 
+unpack import std;
+
 class Person {
-  build(name, age) {
-    this.name = name;
-    this.age = age;
+  let name;
+  let age;
+
+  build(_name, _age) {
+    name = _name;
+    age = _age;
   }
 
   func sayHello() {
-    println("Hello! My name is " + asString(this.name) + ". I am " + 
-              asString(this.age) + " years old.");
+    println("Hello! My name is " + name + ". I am " + 
+              asString(age) + " years old.");
+  }
+
+  func getName() {
+    return name;
+  }
+
+  func getAge() {
+    return age;
+  }
+
+  func call(other) {
+    println("* " + name + " is calling " + other.getName() + "...\a");
+    println(name + ": Hello there " + other.getName() + "! How are you?");
   }
 
   func def string() {
-    return this.name + " (" + asString(this.age) + ")";
+    return name + " (" + asString(age) + ")";
+  }
+
+  func def eq(other) {
+    return name == other.getName() && age == other.getAge();
   }
 }
 

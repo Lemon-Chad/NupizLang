@@ -7,6 +7,10 @@ The following documentation is very rough and intended to serve as a starting po
 
 ## Table of Contents
 
+### [Library Documentation](vm/libraries/DOCS.md)
+
+### Language Documentation
+
 1. [Build Instructions](#build-instructions)
 1. [Compiler Usage](#compiler-usage)
 1. [Variables](#variables)

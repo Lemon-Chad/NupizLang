@@ -59,6 +59,14 @@ ObjString* defineConstant(VM* vm, ObjString* lib, const char* name, Value val) {
     return nameString;
 }
 
+bool expectArgs(VM* vm, int argc, int expected) {
+    if (argc != expected) {
+        runtimeError(vm, "Expected %d args, got %d.", expected, argc);
+        return false;
+    }
+    return true;
+}
+
 bool importLibrary(VM* vm, ObjString* lib) {
     Value libVal;
     if (!tableGet(&vm->libraries, lib, &libVal))

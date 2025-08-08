@@ -191,6 +191,20 @@ ObjLibrary* newLibrary(VM* vm, ObjString* name, ImportLibrary init) {
     return library;
 }
 
+ObjPtr* newPtr(VM* vm, char* origin, int typeEncoding) {
+    ObjPtr* ptr = ALLOCATE_OBJ(vm, ObjPtr, OBJ_PTR);
+
+    ptr->origin = origin;
+    ptr->typeEncoding = typeEncoding;
+
+    ptr->blackenFn = NULL;
+    ptr->freeFn = NULL;
+    ptr->printFn = NULL;
+    ptr->stringFn = NULL;
+
+    return ptr;
+}
+
 static ObjString* strFunction(VM* vm, ObjFunction* func) {
     if (func->name == NULL) {
         return formatString(vm, "<script>");
@@ -249,6 +263,12 @@ ObjString* strObject(VM* vm, Value val) {
             return formatString(vm, "<library '%s'>", AS_LIBRARY(val)->name->chars);
         case OBJ_ATTRIBUTE:
             return formatString(vm, "attr");
+        case OBJ_PTR: {
+            ObjPtr* ptr = AS_PTR(val);
+            if (ptr->stringFn != NULL)
+                return ptr->stringFn(vm, ptr);
+            return formatString(vm, "< ptr '%s'[%d] >", ptr->origin, ptr->typeEncoding);
+        }
     }
     return formatString(vm, "undefined");
 }
@@ -293,6 +313,14 @@ void printObject(Value val) {
         case OBJ_ATTRIBUTE:
             printf("attr");
             break;
+        case OBJ_PTR: {
+            ObjPtr* ptr = AS_PTR(val);
+            if (ptr->printFn != NULL)
+                ptr->printFn(ptr);
+            else
+                printf("< ptr '%s'[%d] >", ptr->origin, ptr->typeEncoding);
+            break;
+        }
         default:
             printf("undefined");
             break;

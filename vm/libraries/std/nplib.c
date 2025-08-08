@@ -21,20 +21,16 @@ static NativeResult printlnNative(VM* vm, int argc, Value* args) {
 }
 
 static NativeResult asStringNative(VM* vm, int argc, Value* args) {
-    if (argc != 1) {
-        runtimeError(vm, "Expected 1 arg, got %d.", argc);
+    if (!expectArgs(vm, argc, 1))
         return NATIVE_FAIL;
-    }
 
     Value val = OBJ_VAL(strValue(vm, args[0]));
     return NATIVE_VAL(val);
 }
 
 static NativeResult lengthNative(VM* vm, int argc, Value* args) {
-    if (argc != 1) {
-        runtimeError(vm, "Expected 1 arg, got %d.", argc);
+    if (!expectArgs(vm, argc, 1))
         return NATIVE_FAIL;
-    }
 
     Value arg = args[0];
     if (IS_STRING(arg)) {
@@ -48,10 +44,8 @@ static NativeResult lengthNative(VM* vm, int argc, Value* args) {
 }
 
 static NativeResult appendNative(VM* vm, int argc, Value* args) {
-    if (argc != 2) {
-        runtimeError(vm, "Expected 2 args, got %d.", argc);
+    if (!expectArgs(vm, argc, 2))
         return NATIVE_FAIL;
-    }
 
     Value list = args[0];
     Value ele = args[1];
@@ -69,10 +63,8 @@ static NativeResult appendNative(VM* vm, int argc, Value* args) {
 }
 
 static NativeResult removeNative(VM* vm, int argc, Value* args) {
-    if (argc != 2) {
-        runtimeError(vm, "Expected 2 args, got %d.", argc);
+    if (!expectArgs(vm, argc, 2))
         return NATIVE_FAIL;
-    }
 
     Value list = args[0];
     Value ele = args[1];
@@ -102,10 +94,8 @@ static NativeResult removeNative(VM* vm, int argc, Value* args) {
 }
 
 static NativeResult popNative(VM* vm, int argc, Value* args) {
-    if (argc != 1) {
-        runtimeError(vm, "Expected 1 arg, got %d.", argc);
+    if (!expectArgs(vm, argc, 1))
         return NATIVE_FAIL;
-    }
 
     Value list = args[0];
     if (!IS_LIST(list)) {
@@ -127,6 +117,16 @@ static NativeResult clockNative(VM* vm, int argc, Value* args) {
     return NATIVE_VAL(NUMBER_VAL(((double) clock()) / CLOCKS_PER_SEC));
 }
 
+static NativeResult asByteNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 1))
+        return NATIVE_FAIL;
+    if (!IS_STRING(args[0]) || AS_STRING(args[0])->length != 1) {
+        runtimeError(vm, "Expected character as argument.");
+        return NATIVE_FAIL;
+    }
+    return NATIVE_VAL(NUMBER_VAL((uint8_t) AS_CSTRING(args[0])[0]));
+}
+
 bool importNPLib(VM* vm, ObjString* lib) {
     LIBFUNC("print", printNative);
     LIBFUNC("println", printlnNative);
@@ -136,6 +136,7 @@ bool importNPLib(VM* vm, ObjString* lib) {
     LIBFUNC("remove", removeNative);
     LIBFUNC("pop", popNative);
     LIBFUNC("clock", clockNative);
+    LIBFUNC("asByte", asByteNative);
 
     return true;
 }

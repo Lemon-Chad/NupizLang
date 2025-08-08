@@ -108,6 +108,14 @@ static void freeObject(VM* vm, Obj* obj) {
         case OBJ_ATTRIBUTE:
             FREE(vm, ObjAttribute, obj);
             break;
+        
+        case OBJ_PTR: {
+            ObjPtr* ptr = (ObjPtr*) obj;
+            if (ptr->freeFn != NULL)
+                ptr->freeFn(vm, ptr);
+            FREE(vm, ObjPtr, obj);
+            break;
+        }
     }
 }
 
@@ -260,6 +268,13 @@ static void blackenObject(VM* vm, Obj* obj) {
         case OBJ_ATTRIBUTE: {
             ObjAttribute* attr = (ObjAttribute*) obj;
             markValue(vm, attr->val);
+            break;
+        }
+
+        case OBJ_PTR: {
+            ObjPtr* ptr = (ObjPtr*) obj;
+            if (ptr->blackenFn != NULL)
+                ptr->blackenFn(vm, ptr);
             break;
         }
 

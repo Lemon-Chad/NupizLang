@@ -21,6 +21,7 @@
 #define IS_NAMESPACE(val) isObjType(val, OBJ_NAMESPACE)
 #define IS_LIBRARY(val) isObjType(val, OBJ_LIBRARY)
 #define IS_ATTRIBUTE(val) isObjType(val, OBJ_ATTRIBUTE)
+#define IS_PTR(val) isObjType(val, OBJ_PTR)
 
 #define AS_STRING(val) ((ObjString*) AS_OBJ(val))
 #define AS_CSTRING(val) (((ObjString*) AS_OBJ(val))->chars)
@@ -34,6 +35,7 @@
 #define AS_NAMESPACE(val) ((ObjNamespace*) AS_OBJ(val))
 #define AS_LIBRARY(val) ((ObjLibrary*) AS_OBJ(val))
 #define AS_ATTRIBUTE(val) ((ObjAttribute*) AS_OBJ(val))
+#define AS_PTR(val) ((ObjPtr*) AS_OBJ(val))
 
 typedef enum {
     OBJ_STRING,
@@ -48,6 +50,7 @@ typedef enum {
     OBJ_NAMESPACE,
     OBJ_LIBRARY,
     OBJ_ATTRIBUTE,
+    OBJ_PTR,
 } ObjType;
 
 struct Obj {
@@ -84,6 +87,17 @@ struct ObjClosure {
 
     ObjUpvalue** upvalues;
     int upvalueCount;
+};
+
+struct ObjPtr {
+    Obj obj;
+    char* origin;
+    int typeEncoding;
+    void* ptr;
+    PtrFreeFunc freeFn;
+    PtrBlackenFunc blackenFn;
+    PtrPrintFunc printFn;
+    PtrStringFunc stringFn;
 };
 
 #define DEFAULT_METHOD_COUNT 2
@@ -157,6 +171,7 @@ ObjBoundMethod* newBoundMethod(VM* vm, Value reciever, ObjClosure* method);
 ObjList* newList(VM* vm);
 ObjNamespace* newNamespace(VM* vm, ObjString* name);
 ObjLibrary* newLibrary(VM* vm, ObjString* name, ImportLibrary init);
+ObjPtr* newPtr(VM* vm, char* origin, int typeEncoding);
 
 bool writeNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value val, bool isPublic);
 bool getNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value* ptr, bool internal);

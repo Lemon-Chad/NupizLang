@@ -18,11 +18,17 @@ typedef struct ObjList ObjList;
 typedef struct ObjNamespace ObjNamespace;
 typedef struct ObjLibrary ObjLibrary;
 typedef struct ObjAttribute ObjAttribute;
+typedef struct ObjPtr ObjPtr;
 
 typedef struct VM VM;
 typedef struct Chunk Chunk;
 typedef struct Compiler Compiler;
 typedef struct ClassCompiler ClassCompiler;
+
+typedef void (*PtrBlackenFunc)(VM* vm, ObjPtr* ptr);
+typedef void (*PtrFreeFunc)(VM* vm, ObjPtr* ptr);
+typedef ObjString* (*PtrStringFunc)(VM* vm, ObjPtr* ptr);
+typedef void (*PtrPrintFunc)(ObjPtr* ptr);
 
 typedef struct NativeResult NativeResult;
 

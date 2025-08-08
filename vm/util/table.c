@@ -18,19 +18,19 @@ void freeTable(VM* vm, Table* tb) {
     initTable(tb);
 }
 
-static void printEntries(Entry* entries, int capacity) {
-    printf("{ ");
-    for (int i = 0; i < capacity; i++) {
-        Entry* entry = &entries[i];
-        if (entry->key == NULL)
-            continue;
+// static void printEntries(Entry* entries, int capacity) {
+//     printf("{ ");
+//     for (int i = 0; i < capacity; i++) {
+//         Entry* entry = &entries[i];
+//         if (entry->key == NULL)
+//             continue;
         
-        printf("(\"%s\"[%d] -> ", entry->key->chars, i);
-        printValue(entry->value);
-        printf(") ");
-    }
-    printf("}");
-}
+//         printf("(\"%s\"[%d] -> ", entry->key->chars, i);
+//         printValue(entry->value);
+//         printf(") ");
+//     }
+//     printf("}");
+// }
 
 static Entry* findEntry(Entry* entries, int capacity, ObjString* key) {
     uint32_t idx = key->hash & (capacity - 1);

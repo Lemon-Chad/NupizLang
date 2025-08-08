@@ -10,7 +10,7 @@
 - [x] Dynamic arrays
 - [x] Library handler
 - [x] File imports
-- [ ] File IO
+- [x] File IO
 - [ ] Dynamic maps
 - [ ] Self hosted compiler
 - [ ] Double pass compiling

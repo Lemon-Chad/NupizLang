@@ -38,10 +38,12 @@ static NativeResult findNative(VM* vm, int argc, Value* args) {
     }
 
     NPVector* vec = AS_NPVECTOR(args[0]);
-    auto it = std::find(vec->vec->begin(), vec->vec->end(), args[1]);
+    Value target = args[1];
+    auto it = std::find_if(vec->vec->begin(), vec->vec->end(), 
+        [vm, target](Value val) { return valuesEqual(vm, val, target); });
     if (it == vec->vec->end())
         return NATIVE_VAL(NUMBER_VAL(-1));
-    return NATIVE_VAL(NUMBER_VAL(std::distance(vec->vec->begin(), it)));
+    return NATIVE_VAL(NUMBER_VAL((double) std::distance(vec->vec->begin(), it)));
 }
 
 static NativeResult appendNative(VM* vm, int argc, Value* args) {
@@ -105,7 +107,7 @@ static NativeResult sizeNative(VM* vm, int argc, Value* args) {
         return NATIVE_FAIL;
     }
 
-    return NATIVE_VAL(NUMBER_VAL(AS_NPVECTOR(args[0])->vec->size()));
+    return NATIVE_VAL(NUMBER_VAL((double) AS_NPVECTOR(args[0])->vec->size()));
 }
 
 static NativeResult atNative(VM* vm, int argc, Value* args) {
@@ -162,12 +164,14 @@ static NativeResult insertNative(VM* vm, int argc, Value* args) {
 
 bool importVecLib(VM* vm, ObjString* lib) {
     LIBFUNC("vec", vecNative);
+    LIBFUNC("vecFrom", vecFromNative);
     LIBFUNC("append", appendNative);
     LIBFUNC("insert", insertNative);
     LIBFUNC("remove", removeNative);
     LIBFUNC("pop", popNative);
     LIBFUNC("size", sizeNative);
     LIBFUNC("at", atNative);
+    LIBFUNC("find", findNative);
 
     return true;
 }

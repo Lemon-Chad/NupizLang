@@ -1,6 +1,6 @@
 
 CFLAGS = -Wall -Wno-incompatible-pointer-types-discards-qualifiers
-CPPFLAGS = -Wall
+CPPFLAGS = -Wall -std=c++20
 
 SRCDIR = .
 OBJDIR = ../lib

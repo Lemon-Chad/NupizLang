@@ -4,9 +4,13 @@
 
 #include <vector>
 
+extern "C" {
+
 #include "../core/extension.h"
 
-const char* npvecPtrOrigin = "nupiz.vec";
+static const char* npvecPtrOrigin = "nupiz.vec";
+
+}
 
 #define IS_NPVECTOR(val) (IS_PTR(val) && AS_PTR(val)->origin == npvecPtrOrigin && \
     AS_PTR(val)->typeEncoding == 0)

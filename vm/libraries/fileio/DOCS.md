@@ -1,6 +1,8 @@
 
 # IOFile Documentation
 
+`import iofile;`
+
 Rudimentary high level file IO library for Nupiz.
 
 - [openFile](#openfile)

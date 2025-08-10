@@ -1,6 +1,8 @@
 
 # NPVec Documentation
 
+`import npvec;`
+
 Fast C++ vector library for Nupiz.
 
 - [vec](#vec)

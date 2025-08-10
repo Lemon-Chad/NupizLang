@@ -1,6 +1,8 @@
 
 # std Documentation
 
+`import std;`
+
 Standard library for Nupiz.
 
 - [print](#print)

@@ -98,13 +98,15 @@ struct ObjPtr {
     PtrBlackenFunc blackenFn;
     PtrPrintFunc printFn;
     PtrStringFunc stringFn;
+    PtrHashFunc hashFn;
 };
 
-#define DEFAULT_METHOD_COUNT 2
+#define DEFAULT_METHOD_COUNT 3
 
 typedef enum {
     DEFMTH_STRING,
     DEFMTH_EQ,
+    DEFMTH_HASH,
 } DefaultMethods;
 
 struct ObjClass {

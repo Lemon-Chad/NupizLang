@@ -589,6 +589,8 @@ static void method(Parser* parser) {
             constant = DEFMTH_STRING;
         } else if (identifierEquals(&parser->previous, "eq")) {
             constant = DEFMTH_EQ;
+        } else if (identifierEquals(&parser->previous, "hash")) {
+            constant = DEFMTH_HASH;
         } else {
             error(parser, "Unknown default method.");
         }

@@ -11,7 +11,7 @@
 - [x] Library handler
 - [x] File imports
 - [x] File IO
-- [ ] Dynamic maps
+- [x] Dynamic maps
 - [ ] Self hosted compiler
 - [ ] Double pass compiling
 - [ ] Static typing

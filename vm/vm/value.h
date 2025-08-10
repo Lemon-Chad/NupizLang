@@ -29,6 +29,7 @@ typedef void (*PtrBlackenFunc)(VM* vm, ObjPtr* ptr);
 typedef void (*PtrFreeFunc)(VM* vm, ObjPtr* ptr);
 typedef ObjString* (*PtrStringFunc)(VM* vm, ObjPtr* ptr);
 typedef void (*PtrPrintFunc)(ObjPtr* ptr);
+typedef size_t (*PtrHashFunc)(VM* vm, ObjPtr* ptr);
 
 typedef struct NativeResult NativeResult;
 

@@ -426,6 +426,9 @@ static void defineDefMethod(VM* vm, int idx) {
         case DEFMTH_EQ:
             name = formatString(vm, "eq");
             break;
+        case DEFMTH_HASH:
+            name = formatString(vm, "hash");
+            break;
         default:
             runtimeError(vm, "Unkown default method '%d'.", idx);
             break;

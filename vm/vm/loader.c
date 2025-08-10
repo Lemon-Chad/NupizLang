@@ -225,7 +225,7 @@ static ObjNamespace* readNamespace(BytecodeLoader* loader) {
     consume(loader, DUMP_NAMESPACE);
 
     ObjString* name = readString(loader);
-    ObjNamespace* namespace = newNamespace(loader->vm, name);
+    ObjNamespace* nspace = newNamespace(loader->vm, name);
 
     int length = readInt(loader);
     printf("len: %d\n", length);
@@ -234,10 +234,10 @@ static ObjNamespace* readNamespace(BytecodeLoader* loader) {
         Value val = readValue(loader);
         bool public = advance(loader) == 1;
         
-        writeNamespace(loader->vm, namespace, key, val, public);
+        writeNamespace(loader->vm, nspace, key, val, public);
     }
 
-    return namespace;
+    return nspace;
 }
 
 ObjFunction* readBytecode(BytecodeLoader* loader) {

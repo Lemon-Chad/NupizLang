@@ -144,7 +144,7 @@ struct ObjNamespace {
 struct ObjLibrary {
     Obj obj;
     ObjString* name;
-    ObjNamespace* namespace;
+    ObjNamespace* nspace;
     ImportLibrary initializer;
     bool imported;
 };
@@ -171,10 +171,10 @@ ObjBoundMethod* newBoundMethod(VM* vm, Value reciever, ObjClosure* method);
 ObjList* newList(VM* vm);
 ObjNamespace* newNamespace(VM* vm, ObjString* name);
 ObjLibrary* newLibrary(VM* vm, ObjString* name, ImportLibrary init);
-ObjPtr* newPtr(VM* vm, char* origin, int typeEncoding);
+ObjPtr* newPtr(VM* vm, const char* origin, int typeEncoding);
 
-bool writeNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value val, bool isPublic);
-bool getNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value* ptr, bool internal);
+bool writeNamespace(VM* vm, ObjNamespace* nspace, ObjString* name, Value val, bool isPublic);
+bool getNamespace(VM* vm, ObjNamespace* nspace, ObjString* name, Value* ptr, bool internal);
 
 ObjAttribute* newAttribute(VM* vm, Value val, bool isPublic, bool isStatic, bool isConstant);
 ObjAttribute* copyAttribute(VM* vm, Value attr);

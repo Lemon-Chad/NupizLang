@@ -94,9 +94,9 @@ static void freeObject(VM* vm, Obj* obj) {
         }
 
         case OBJ_NAMESPACE: {
-            ObjNamespace* namespace = (ObjNamespace*) obj;
-            freeTable(vm, &namespace->values);
-            freeTable(vm, &namespace->publics);
+            ObjNamespace* nspace = (ObjNamespace*) obj;
+            freeTable(vm, &nspace->values);
+            freeTable(vm, &nspace->publics);
             FREE(vm, ObjNamespace, obj);
             break;
         }
@@ -250,10 +250,10 @@ static void blackenObject(VM* vm, Obj* obj) {
             break;
         
         case OBJ_NAMESPACE: {
-            ObjNamespace* namespace = (ObjNamespace*) obj;
-            markObject(vm, (Obj*) namespace->name);
-            markTable(vm, &namespace->values);
-            markTable(vm, &namespace->publics);
+            ObjNamespace* nspace = (ObjNamespace*) obj;
+            markObject(vm, (Obj*) nspace->name);
+            markTable(vm, &nspace->values);
+            markTable(vm, &nspace->publics);
             break;
         }
 
@@ -261,7 +261,7 @@ static void blackenObject(VM* vm, Obj* obj) {
             ObjLibrary* library = (ObjLibrary*) obj;
             markObject(vm, (Obj*) library->name);
             if (library->imported)
-                markObject(vm, (Obj*) library->namespace);
+                markObject(vm, (Obj*) library->nspace);
             break;
         }
 

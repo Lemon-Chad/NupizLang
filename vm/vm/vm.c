@@ -110,10 +110,10 @@ static bool getBound(VM* vm, ObjString* name) {
             }
 
             case OBJ_NAMESPACE: {
-                ObjNamespace* namespace = AS_NAMESPACE(frame->bound);
+                ObjNamespace* nspace = AS_NAMESPACE(frame->bound);
 
                 Value val;
-                if (!getNamespace(vm, namespace, name, &val, true)) {
+                if (!getNamespace(vm, nspace, name, &val, true)) {
                     runtimeError(vm, "Undefined attribute '%s'.", name->chars);
                     return false;
                 }
@@ -144,9 +144,9 @@ static bool setBound(VM* vm, ObjString* name, Value val) {
                     AS_CLASS(frame->bound), name, val, true);
             
             case OBJ_NAMESPACE: {
-                ObjNamespace* namespace = AS_NAMESPACE(frame->bound);
+                ObjNamespace* nspace = AS_NAMESPACE(frame->bound);
 
-                if (!writeNamespace(vm, namespace, name, val, true)) {
+                if (!writeNamespace(vm, nspace, name, val, true)) {
                     runtimeError(vm, "Undefined attribute '%s'.", name->chars);
                     return false;
                 }
@@ -286,10 +286,10 @@ static bool invoke(VM* vm, ObjString* name, int argc) {
         }
 
         case OBJ_NAMESPACE: {
-            ObjNamespace* namespace = AS_NAMESPACE(reciever);
+            ObjNamespace* nspace = AS_NAMESPACE(reciever);
             
             Value value;
-            if (!getNamespace(vm, namespace, name, &value, false)) {
+            if (!getNamespace(vm, nspace, name, &value, false)) {
                 runtimeError(vm, "Undefined attribute '%s'.", name->chars);
                 return false;
             }
@@ -749,10 +749,10 @@ InterpretResult run(VM* vm) {
                     }
 
                     case OBJ_NAMESPACE: {
-                        ObjNamespace* namespace = AS_NAMESPACE(accessed);
+                        ObjNamespace* nspace = AS_NAMESPACE(accessed);
 
                         Value val;
-                        if (!getNamespace(vm, namespace, name, &val, false)) {
+                        if (!getNamespace(vm, nspace, name, &val, false)) {
                             runtimeError(vm, "Undefined property '%s'.", name->chars);
                             return INTERPRET_RUNTIME_ERR;
                         }
@@ -929,7 +929,7 @@ InterpretResult run(VM* vm) {
                 Value libVal;
                 tableGet(&vm->libraries, lib, &libVal);
                 
-                push(vm, OBJ_VAL(AS_LIBRARY(libVal)->namespace));
+                push(vm, OBJ_VAL(AS_LIBRARY(libVal)->nspace));
                 break;
             }
 
@@ -942,14 +942,14 @@ InterpretResult run(VM* vm) {
 
                 runFunc(&temp, func);
 
-                ObjNamespace* namespace = newNamespace(vm, filename);
-                vm->stackTop[-2] = OBJ_VAL(namespace);
+                ObjNamespace* nspace = newNamespace(vm, filename);
+                vm->stackTop[-2] = OBJ_VAL(nspace);
 
                 for (int i = 0; i < temp.globals.capacity; i++) {
                     Entry* entry = &temp.globals.entries[i];
                     if (entry->key == NULL)
                         continue;
-                    writeNamespace(vm, namespace, entry->key, entry->value, true);
+                    writeNamespace(vm, nspace, entry->key, entry->value, true);
                 }
 
                 decoupleVM(&temp);

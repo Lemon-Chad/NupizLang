@@ -113,26 +113,26 @@ ObjList* newList(VM* vm) {
 }
 
 ObjNamespace* newNamespace(VM* vm, ObjString* name) {
-    ObjNamespace* namespace = ALLOCATE_OBJ(vm, ObjNamespace, OBJ_NAMESPACE);
+    ObjNamespace* nspace = ALLOCATE_OBJ(vm, ObjNamespace, OBJ_NAMESPACE);
     
-    namespace->name = name;
-    initTable(&namespace->publics);
-    initTable(&namespace->values);
+    nspace->name = name;
+    initTable(&nspace->publics);
+    initTable(&nspace->values);
 
-    return namespace;
+    return nspace;
 }
 
-bool writeNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value val, bool isPublic) {
-    bool newKey = tableSet(vm, &namespace->values, name, val);
+bool writeNamespace(VM* vm, ObjNamespace* nspace, ObjString* name, Value val, bool isPublic) {
+    bool newKey = tableSet(vm, &nspace->values, name, val);
     if (isPublic)
-        tableSet(vm, &namespace->publics, name, val);
+        tableSet(vm, &nspace->publics, name, val);
     return newKey;
 }
 
-bool getNamespace(VM* vm, ObjNamespace* namespace, ObjString* name, Value* ptr, bool internal) {
-    if (!internal && !tableGet(&namespace->publics, name, ptr))
+bool getNamespace(VM* vm, ObjNamespace* nspace, ObjString* name, Value* ptr, bool internal) {
+    if (!internal && !tableGet(&nspace->publics, name, ptr))
         return false;
-    return tableGet(&namespace->values, name, ptr);
+    return tableGet(&nspace->values, name, ptr);
 }
 
 ObjString* takeString(VM* vm, const char* src, int len) {
@@ -185,13 +185,13 @@ ObjLibrary* newLibrary(VM* vm, ObjString* name, ImportLibrary init) {
 
     library->imported = false;
     library->initializer = init;
-    library->namespace = NULL;
+    library->nspace = NULL;
     library->name = name;
 
     return library;
 }
 
-ObjPtr* newPtr(VM* vm, char* origin, int typeEncoding) {
+ObjPtr* newPtr(VM* vm, const char* origin, int typeEncoding) {
     ObjPtr* ptr = ALLOCATE_OBJ(vm, ObjPtr, OBJ_PTR);
 
     ptr->origin = origin;

@@ -56,19 +56,19 @@ static void writeObject(VM* vm, DumpedBytes* bytes, Obj* obj) {
             break;
         
         case OBJ_NAMESPACE: {
-            ObjNamespace* namespace = (ObjNamespace*) obj;
+            ObjNamespace* nspace = (ObjNamespace*) obj;
             writeByte(vm, bytes, DUMP_NAMESPACE);
-            writeObject(vm, bytes, (Obj*) namespace->name);
-            writeInt(vm, bytes, namespace->values.count);
-            for (int i = 0; i < namespace->values.capacity; i++) {
-                Entry* entry = &namespace->values.entries[i];
+            writeObject(vm, bytes, (Obj*) nspace->name);
+            writeInt(vm, bytes, nspace->values.count);
+            for (int i = 0; i < nspace->values.capacity; i++) {
+                Entry* entry = &nspace->values.entries[i];
                 if (entry->key == NULL)
                     continue;
                 
                 writeObject(vm, bytes, (Obj*) entry->key);
                 takeBytes(vm, bytes, dumpValue(vm, entry->value));
                 writeByte(vm, bytes, 
-                    tableGet(&namespace->publics, entry->key, NULL) ? 1 : 0);
+                    tableGet(&nspace->publics, entry->key, NULL) ? 1 : 0);
             }
             break;
         }

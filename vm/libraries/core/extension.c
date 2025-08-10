@@ -49,8 +49,8 @@ ObjString* defineConstant(VM* vm, ObjString* lib, const char* name, Value val) {
         exit(1);
     }
 
-    ObjNamespace* namespace = library->namespace;
-    if (!writeNamespace(vm, namespace, nameString, val, true)) {
+    ObjNamespace* nspace = library->nspace;
+    if (!writeNamespace(vm, nspace, nameString, val, true)) {
         fprintf(stderr, "Redefinition of '%s.%s'.", lib->chars, name);
         exit(1);
     }
@@ -77,11 +77,11 @@ bool importLibrary(VM* vm, ObjString* lib) {
         return true;
     
     library->imported = true;
-    library->namespace = newNamespace(vm, library->name);
+    library->nspace = newNamespace(vm, library->name);
     if (!library->initializer(vm, lib))
         return false;
     
-    tableSet(vm, &vm->globals, library->name, OBJ_VAL(library->namespace));
+    tableSet(vm, &vm->globals, library->name, OBJ_VAL(library->nspace));
     
     return true;
 }

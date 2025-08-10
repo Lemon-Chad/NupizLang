@@ -11,6 +11,7 @@
 - [x] Library handler
 - [x] File imports
 - [x] File IO
+- [x] Fast vectors
 - [ ] Dynamic maps
 - [ ] Self hosted compiler
 - [ ] Double pass compiling

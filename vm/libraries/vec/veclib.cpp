@@ -5,42 +5,7 @@
 
 #include "veclib.h"
 #include "../core/extension.h"
-
-typedef struct {
-    std::vector<Value>* vec;
-} NPVector;
-
-const char* npvecPtrOrigin = "nupiz.vec";
-
-#define IS_NPVECTOR(val) (IS_PTR(val) && AS_PTR(val)->origin == npvecPtrOrigin && \
-    AS_PTR(val)->typeEncoding == 0)
-#define AS_NPVECTOR(val) ((NPVector*) AS_PTR(val)->ptr)
-
-static void freeNPVector(VM* vm, ObjPtr* ptr) {
-    NPVector* npvec = (NPVector*) ptr->ptr;
-    delete npvec->vec;
-
-    FREE(vm, NPVector, npvec);
-    ptr->ptr = NULL;
-}
-
-static void blackenNPVector(VM* vm, ObjPtr* ptr) {
-    NPVector* npvec = (NPVector*) ptr->ptr;
-    for (int i = 0; i < npvec->vec->size(); i++)
-        markValue(vm, (*npvec->vec)[i]);
-}
-
-static ObjPtr* newNPVector(VM* vm, std::vector<Value>* vec){
-    NPVector* npvector = ALLOCATE(vm, NPVector, 1);
-    npvector->vec = vec;
-
-    ObjPtr* ptr = newPtr(vm, npvecPtrOrigin, 0);
-    ptr->ptr = (void*) npvector;
-    ptr->freeFn = freeNPVector;
-    ptr->blackenFn = blackenNPVector;
-
-    return ptr;
-}
+#include "npvec.hpp"
 
 static NativeResult vecNative(VM* vm, int argc, Value* args) {
     std::vector<Value>* vec = new std::vector<Value>(args, args + argc);

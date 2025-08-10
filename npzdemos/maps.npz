@@ -1,0 +1,53 @@
+
+import std;
+const maps = import npmap;
+const vecs = import npvec;
+
+func vecString(vec) {
+  let s = "<";
+  let n = vecs.size(vec);
+
+  for (let i = 0; i < n; i += 1) {
+    s = s + std.asString(vecs.at(vec, i));
+    if (i < n - 1)
+      s = s + ", ";
+  }
+
+  return s + ">";
+}
+
+func mapString(map) {
+  let s = "{";
+  let keys = maps.keys(map);
+  let n = vecs.size(keys);
+
+  for (let i = 0; i < n; i += 1) {
+    let k = vecs.at(keys, i);
+    s = s + std.asString(k) + ": " + std.asString(maps.get(map, k));
+    if (i < n - 1)
+      s = s + ", ";
+  }
+
+  return s + "}";
+}
+
+let map = maps.map("apple", 1, "orange", 2, "banana", 5);
+std.println(mapString(map));
+
+maps.put(map, "grape", 7);
+std.println(mapString(map));
+
+maps.put(map, "grape", 4);
+std.println(mapString(map));
+
+maps.emplace(map, "apple", 3);
+std.println(mapString(map));
+
+maps.emplace(map, "mango", 6);
+std.println(mapString(map));
+
+maps.remove(map, "mango");
+std.println(mapString(map));
+
+std.println(maps.has(map, "grape"));
+std.println(maps.get(map, "grape"));

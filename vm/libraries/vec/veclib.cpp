@@ -48,6 +48,37 @@ static NativeResult vecNative(VM* vm, int argc, Value* args) {
     return NATIVE_VAL(OBJ_VAL(ptr));
 }
 
+static NativeResult vecFromNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 1)) {
+        return NATIVE_FAIL;
+    }
+    if (!IS_LIST(args[0])) {
+        runtimeError(vm, "Expected list as argument.");
+        return NATIVE_FAIL;
+    }
+
+    ValueArray* list = &AS_LIST(args[0])->list;
+    std::vector<Value>* vec = new std::vector<Value>(list->values, list->values + list->count);
+    ObjPtr* ptr = newNPVector(vm, vec);
+    return NATIVE_VAL(OBJ_VAL(ptr));
+}
+
+static NativeResult findNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 2)) {
+        return NATIVE_FAIL;
+    }
+    if (!IS_NPVECTOR(args[0])) {
+        runtimeError(vm, "Expected vector as argument.");
+        return NATIVE_FAIL;
+    }
+
+    NPVector* vec = AS_NPVECTOR(args[0]);
+    auto it = std::find(vec->vec->begin(), vec->vec->end(), args[1]);
+    if (it == vec->vec->end())
+        return NATIVE_VAL(NUMBER_VAL(-1));
+    return NATIVE_VAL(NUMBER_VAL(std::distance(vec->vec->begin(), it)));
+}
+
 static NativeResult appendNative(VM* vm, int argc, Value* args) {
     if (!expectArgs(vm, argc, 2))
         return NATIVE_FAIL;

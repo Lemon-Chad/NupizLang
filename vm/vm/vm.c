@@ -46,6 +46,8 @@ void initVM(VM* vm) {
     vm->compiler = NULL;
     vm->safeMode = 0;
     vm->pauseGC = 0;
+    vm->isMain = false;
+    vm->mainFunc = NULL;
 
     initTable(&vm->globals);
     initTable(&vm->strings);
@@ -59,6 +61,9 @@ void initVM(VM* vm) {
     vm->nextGC = 1024 * 1024;
 
     defineAllLibraries(vm);
+
+    vm->argv = NULL;
+    vm->argc = 0;
 }
 
 void freeVM(VM* vm) {
@@ -73,12 +78,11 @@ void decoupleVM(VM* vm) {
     freeTable(vm, &vm->strings);   
 }
 
-static bool getBound(VM* vm, ObjString* name) {
-    CallFrame* frame = &vm->frames[vm->frameCount - 1];
-    if (IS_OBJ(frame->bound)) {
-        switch (OBJ_TYPE(frame->bound)) {
+static bool getBound(VM* vm, Value bound, ObjString* name) {
+    if (IS_OBJ(bound)) {
+        switch (OBJ_TYPE(bound)) {
             case OBJ_INSTANCE: {
-                ObjInstance* inst = AS_INSTANCE(frame->bound);
+                ObjInstance* inst = AS_INSTANCE(bound);
 
                 Value val;
                 vm->safeMode++;
@@ -90,11 +94,14 @@ static bool getBound(VM* vm, ObjString* name) {
                 }
                 vm->safeMode--;
 
+                if (!IS_NULL(inst->bound))
+                    return getBound(vm, inst->bound, name);
+
                 return false;
             }
 
             case OBJ_CLASS: {
-                ObjClass* clazz = AS_CLASS(frame->bound);
+                ObjClass* clazz = AS_CLASS(bound);
 
                 Value val;
                 vm->safeMode++;
@@ -106,11 +113,14 @@ static bool getBound(VM* vm, ObjString* name) {
                 }
                 vm->safeMode--;
 
+                if (!IS_NULL(clazz->bound))
+                    return getBound(vm, clazz->bound, name);
+
                 return false;
             }
 
             case OBJ_NAMESPACE: {
-                ObjNamespace* nspace = AS_NAMESPACE(frame->bound);
+                ObjNamespace* nspace = AS_NAMESPACE(bound);
 
                 Value val;
                 if (!getNamespace(vm, nspace, name, &val, true)) {
@@ -188,6 +198,10 @@ static bool call(VM* vm, ObjClosure* clos, int argc, Value binder) {
     frame->slots = vm->stackTop - argc - 1;
     frame->bound = binder;
     return true;
+}
+
+void callFunc(VM* vm, ObjClosure* clos, int argc, Value binder) {
+    call(vm, clos, argc, binder);
 }
 
 static bool callValue(VM* vm, Value callee, int argc) {
@@ -297,6 +311,9 @@ static bool invoke(VM* vm, ObjString* name, int argc) {
             if (IS_CLOSURE(value)) {
                 return call(vm, AS_CLOSURE(value), argc, reciever);
             }
+
+            if (IS_CLASS(value))
+                AS_CLASS(value)->bound = reciever;
 
             return callValue(vm, value, argc);
         }
@@ -589,7 +606,7 @@ InterpretResult run(VM* vm) {
                 Value val;
 
                 vm->safeMode++;
-                if (getBound(vm, name)) {
+                if (getBound(vm, vm->frames[vm->frameCount - 1].bound, name)) {
                     vm->safeMode--;
                     break;
                 }
@@ -762,6 +779,9 @@ InterpretResult run(VM* vm) {
 
                         if (IS_CLOSURE(val))
                             val = OBJ_VAL(newBoundMethod(vm, accessed, AS_CLOSURE(val)));
+                        
+                        if (IS_CLASS(val))
+                            AS_CLASS(val)->bound = accessed;
                         
                         pop(vm);
                         push(vm, val);

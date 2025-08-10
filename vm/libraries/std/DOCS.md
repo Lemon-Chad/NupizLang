@@ -14,6 +14,8 @@ Standard library for Nupiz.
 - [pop](#pop)
 - [clock](#clock)
 - [asByte](#asbyte)
+- [cmdargs](#cmdargs)
+- [main](#main)
 
 ## print
 
@@ -68,3 +70,15 @@ Returns the current time as a UNIX timestamp.
 `asByte(char)`
 
 Takes a character and returns it as a byte.
+
+## cmdargs
+
+`cmdargs()`
+
+Returns a list of command line arguments passed to the program.
+
+## main
+
+`main(func)`
+
+Will execute `func(cmdargs)` if the file is currently the target executable.

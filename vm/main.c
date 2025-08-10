@@ -115,11 +115,32 @@ static void runFile(VM* vm, char* path) {
 
     if (res == INTERPRET_COMPILE_ERR) exit(65);
     if (res == INTERPRET_RUNTIME_ERR) exit(70);
+
+    if (vm->mainFunc != NULL) {
+        push(vm, OBJ_VAL(vm->mainFunc));
+        ObjClosure* clos = newClosure(vm, vm->mainFunc);
+        pop(vm);
+        push(vm, OBJ_VAL(clos));
+
+        ObjList* lst = newList(vm);
+        push(vm, OBJ_VAL(lst));
+        for (int i = 0; i < vm->argc; i++)
+            writeValueArray(vm, &lst->list, 
+                OBJ_VAL(copyString(vm, vm->argv[i], strlen(vm->argv[i]))));
+
+        callFunc(vm, clos, 1, NULL_VAL);
+
+        res = run(vm);
+
+        if (res == INTERPRET_COMPILE_ERR) exit(65);
+        if (res == INTERPRET_RUNTIME_ERR) exit(70);
+    }
 }
 
 int main(int argc, const char* argv[]) {
     VM vm;
     initVM(&vm);
+    vm.isMain = true;
 
     int flags = 0;
     char* compileTarget = "";
@@ -127,6 +148,19 @@ int main(int argc, const char* argv[]) {
     char* runTarget = "";
 
     if (argc == 1) flags |= FLAG_HELP;
+
+    if (argc > 1 && strlen(argv[1]) == 2 && argv[1][0] == '-' && argv[1][1] == 'R') {
+        if (argc < 3) {
+            fprintf(stderr, "Expected binary file name.\n");
+            exit(2);
+        }
+
+        vm.argv = argv + 3;
+        vm.argc = argc - 3;
+        changeDirectory(argv[2]);
+        runFile(&vm, argv[2]);
+        return 0;
+    }
 
     for (int i = 1; i < argc; i++) {
         int arglen = strlen(argv[i]);
@@ -136,6 +170,10 @@ int main(int argc, const char* argv[]) {
         }
 
         switch (argv[i][1]) {
+            case 'R':
+                fprintf(stderr, "-R must be the first flag.\n");
+                exit(2);
+                break;
             case 'c':
                 flags |= FLAG_COMPILE;
                 if (i + 1 >= argc) {
@@ -175,6 +213,8 @@ int main(int argc, const char* argv[]) {
         printf("  -c [target]\t\tCompile target\n");
         printf("  -o [target]\t\tOutput target to file\n");
         printf("  -r [target]\t\tRuns the target compiled file\n");
+        printf("  -R [target]\t\tRuns the target compiled file,\n");
+        printf("             \t\tpassing all remaining args to the VM\n");
         printf("  -v\t\tPrint version\n");
         printf("  -h\t\tPrint this help message\n");
     }

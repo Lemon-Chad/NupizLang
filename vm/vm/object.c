@@ -82,6 +82,7 @@ ObjClass* newClass(VM* vm, ObjString* name) {
     clazz->name = name;
     clazz->constructor = NULL;
     initTable(&clazz->methods);
+    clazz->bound = NULL_VAL;
     return clazz;
 }
 
@@ -96,6 +97,7 @@ ObjInstance* newInstance(VM* vm, ObjClass* clazz) {
         
         tableSet(vm, &inst->fields, entry->key, OBJ_VAL(copyAttribute(vm, entry->value)));
     }
+    inst->bound = clazz->bound;
     return inst;
 }
 

@@ -117,12 +117,14 @@ struct ObjClass {
     Table fields;
     Table staticFields;
     ObjClosure* defaultMethods[DEFAULT_METHOD_COUNT];
+    Value bound;
 };
 
 struct ObjInstance {
     Obj obj;
     ObjClass* clazz;
     Table fields;
+    Value bound;
 };
 
 struct ObjBoundMethod {

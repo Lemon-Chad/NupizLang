@@ -32,6 +32,7 @@ The virtual machine and compiler can be built by running `make all` under the `v
 - `-c [target]` Compile target file
 - `-o [target]` Output compiled binary to target file
 - `-r [target]` Run target binary file
+- `-R [target]` Run target binary file and pass all remaining flags to the VM
 - `-v` Prints the current version stamp
 - `-h` Displays a help message
 

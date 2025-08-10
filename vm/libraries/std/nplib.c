@@ -114,7 +114,41 @@ static NativeResult popNative(VM* vm, int argc, Value* args) {
 }
 
 static NativeResult clockNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 0))
+        return NATIVE_FAIL;
+    
     return NATIVE_VAL(NUMBER_VAL(((double) clock()) / CLOCKS_PER_SEC));
+}
+
+static NativeResult cmdargsNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 0))
+        return NATIVE_FAIL;
+    
+    ObjList* lst = newList(vm);
+    push(vm, OBJ_VAL(lst));
+    for (int i = 0; i < vm->argc; i++)
+        writeValueArray(vm, &lst->list, 
+            OBJ_VAL(copyString(vm, vm->argv[i], strlen(vm->argv[i]))));
+    pop(vm);
+    return NATIVE_VAL(OBJ_VAL(lst));
+}
+
+static NativeResult mainNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 1))
+        return NATIVE_FAIL;
+    
+    if (!IS_CLOSURE(args[0]) || AS_CLOSURE(args[0])->upvalueCount > 0) {
+        runtimeError(vm, "Expected function.");
+        return NATIVE_FAIL;
+    }
+
+    if (vm->mainFunc != NULL) {
+        runtimeError(vm, "Main function already defined.");
+        return NATIVE_FAIL;
+    }
+
+    vm->mainFunc = AS_CLOSURE(args[0])->function;
+    return NATIVE_OK;
 }
 
 static NativeResult asByteNative(VM* vm, int argc, Value* args) {
@@ -137,6 +171,8 @@ bool importNPLib(VM* vm, ObjString* lib) {
     LIBFUNC("pop", popNative);
     LIBFUNC("clock", clockNative);
     LIBFUNC("asByte", asByteNative);
+    LIBFUNC("cmdargs", cmdargsNative);
+    LIBFUNC("main", mainNative);
 
     return true;
 }

@@ -52,6 +52,11 @@ struct VM {
 
     int safeMode;
     int pauseGC;
+
+    const char** argv;
+    int argc;
+    bool isMain;
+    ObjFunction* mainFunc;
 };
 
 typedef enum {
@@ -74,6 +79,7 @@ InterpretResult run(VM* vm);
 
 void runtimeError(VM* vm, const char* format, ...);
 
+void callFunc(VM* vm, ObjClosure* clos, int argc, Value binder);
 NativeResult callDefaultMethod(VM* vm, ObjInstance* inst, int idx, Value* args, int argc);
 
 #endif

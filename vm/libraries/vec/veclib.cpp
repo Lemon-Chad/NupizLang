@@ -55,7 +55,7 @@ static NativeResult appendNative(VM* vm, int argc, Value* args) {
     }
 
     NPVector* npvector = AS_NPVECTOR(args[0]);
-    npvector->vec->push_back(args[1]);
+    npvector->vec->emplace_back(args[1]);
 
     return NATIVE_OK;
 }

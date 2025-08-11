@@ -161,6 +161,53 @@ static NativeResult asByteNative(VM* vm, int argc, Value* args) {
     return NATIVE_VAL(NUMBER_VAL((uint8_t) AS_CSTRING(args[0])[0]));
 }
 
+static NativeResult sliceNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 3))
+        return NATIVE_FAIL;
+    if (!IS_STRING(args[0]) || !IS_NUMBER(args[1]) || !IS_NUMBER(args[2])) {
+        runtimeError(vm, "Expected (string, int, int) as arguments.");
+        return NATIVE_FAIL;
+    }
+    ObjString* str = AS_STRING(args[0]);
+
+    int start = (int) AS_NUMBER(args[1]);
+    if (start < 0)
+        start += str->length + 1;
+    
+    int end = (int) AS_NUMBER(args[2]);
+    if (end < 0)
+        end += str->length + 1;
+
+    if (end > str->length)
+        end = str->length;
+    if (start > end)
+        start = end;
+    
+    if (start < 0 || end < 0) {
+        runtimeError(vm, "Indices out of bounds.");
+        return NATIVE_FAIL;
+    }
+
+    return NATIVE_VAL(OBJ_VAL(copyString(vm, str->chars + start, end - start)));
+}
+
+static NativeResult findNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 2))
+        return NATIVE_FAIL;
+    if (!IS_LIST(args[0])) {
+        runtimeError(vm, "Expected list as first argument.");
+        return NATIVE_FAIL;
+    }
+
+    ObjList* list = AS_LIST(args[0]);
+    for (int i = 0; i < list->list.count; i++) {
+        if (valuesEqual(vm, list->list.values[i], args[1])) {
+            return NATIVE_VAL(NUMBER_VAL(i));
+        }
+    }
+    return NATIVE_VAL(NUMBER_VAL(-1));
+}
+
 bool importNPLib(VM* vm, ObjString* lib) {
     LIBFUNC("print", printNative);
     LIBFUNC("println", printlnNative);
@@ -173,6 +220,8 @@ bool importNPLib(VM* vm, ObjString* lib) {
     LIBFUNC("asByte", asByteNative);
     LIBFUNC("cmdargs", cmdargsNative);
     LIBFUNC("main", mainNative);
+    LIBFUNC("slice", sliceNative);
+    LIBFUNC("find", findNative);
 
     return true;
 }

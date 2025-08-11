@@ -470,7 +470,7 @@ InterpretResult run(VM* vm) {
     #define READ_CONSTANT() (frame->closure->function->chunk.constants.values[READ_BYTE()])
     #define READ_LONG_CONSTANT() (frame->closure->function->chunk.constants.values[READ_BYTE() + (READ_BYTE() << 8) + (READ_BYTE() << 16)])
     #define READ_STRING() AS_STRING(READ_CONSTANT())
-    #define BINARY_OP(velcro, op) \
+    #define BINARY_NUMBER_OP(velcro, op) \
         do { \
             if (!IS_NUMBER(peek(vm, 0)) || !IS_NUMBER(peek(vm, 1))) { \
                 runtimeError(vm, "DTypeErr: Operands must be numbers."); \
@@ -480,6 +480,22 @@ InterpretResult run(VM* vm) {
             double a = AS_NUMBER(pop(vm)); \
             push(vm, velcro(a op b)); \
         } while (false)
+    #define BINARY_JOINT_OP(num_op, str_op) \
+        do { \
+            if (IS_STRING(peek(vm, 0)) && IS_STRING(peek(vm, 1))) { \
+                char* b = AS_CSTRING(pop(vm)); \
+                char* a = AS_CSTRING(pop(vm)); \
+                push(vm, str_op); \
+            } else if (IS_NUMBER(peek(vm, 0)) && IS_NUMBER(peek(vm, 1))) { \
+                double b = AS_NUMBER(pop(vm)); \
+                double a = AS_NUMBER(pop(vm)); \
+                push(vm, num_op); \
+            } else { \
+                runtimeError(vm, "Operands must be of the same type."); \
+                return INTERPRET_RUNTIME_ERR; \
+            } \
+            break; \
+        } while(false)
 
     for (;;) {
         #ifdef DEBUG_TRACE_EXECUTION
@@ -549,13 +565,21 @@ InterpretResult run(VM* vm) {
                 }
                 break;
 
-            case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, -); break;
-            case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, *); break;
-            case OP_DIVIDE: BINARY_OP(NUMBER_VAL, /); break;
-            case OP_GREATER: BINARY_OP(BOOL_VAL, >); break;
-            case OP_GREATER_EQUAL: BINARY_OP(BOOL_VAL, >=); break;
-            case OP_LESS: BINARY_OP(BOOL_VAL, <); break;
-            case OP_LESS_EQUAL: BINARY_OP(BOOL_VAL, <=); break;
+            case OP_SUBTRACT: BINARY_NUMBER_OP(NUMBER_VAL, -); break;
+            case OP_MULTIPLY: BINARY_NUMBER_OP(NUMBER_VAL, *); break;
+            case OP_DIVIDE: BINARY_NUMBER_OP(NUMBER_VAL, /); break;
+            case OP_GREATER: 
+                BINARY_JOINT_OP(BOOL_VAL(a > b), BOOL_VAL(strcmp(a, b) > 0)); 
+                break;
+            case OP_GREATER_EQUAL:
+                BINARY_JOINT_OP(BOOL_VAL(a >= b), BOOL_VAL(strcmp(a, b) >= 0)); 
+                break;
+            case OP_LESS:
+                BINARY_JOINT_OP(BOOL_VAL(a < b), BOOL_VAL(strcmp(a, b) < 0)); 
+                break;
+            case OP_LESS_EQUAL:
+                BINARY_JOINT_OP(BOOL_VAL(a <= b), BOOL_VAL(strcmp(a, b) <= 0)); 
+                break;
             case OP_RETURN: {
                 Value res = pop(vm);
                 closeUpvalues(vm, frame->slots);

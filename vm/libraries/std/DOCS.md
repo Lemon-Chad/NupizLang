@@ -16,6 +16,8 @@ Standard library for Nupiz.
 - [asByte](#asbyte)
 - [cmdargs](#cmdargs)
 - [main](#main)
+- [slice](#slice)
+- [find](#find)
 
 ## print
 
@@ -82,3 +84,15 @@ Returns a list of command line arguments passed to the program.
 `main(func)`
 
 Will execute `func(cmdargs)` if the file is currently the target executable.
+
+## slice
+
+`std.slice(string, start, end)`
+
+Returns a copy of the given string from indices `[start:end)`. Accepts negative indices, which start at the null terminator.
+
+## find
+
+`std.find(list, ele)`
+
+Returns the index of the given element in the list. If the element is not in the list, returns -1.

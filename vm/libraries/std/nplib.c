@@ -34,7 +34,7 @@ static NativeResult lengthNative(VM* vm, int argc, Value* args) {
 
     Value arg = args[0];
     if (IS_STRING(arg)) {
-        return NATIVE_VAL(NUMBER_VAL(strlen(AS_CSTRING(arg))));
+        return NATIVE_VAL(NUMBER_VAL(AS_STRING(arg)->length));
     } else if (IS_LIST(arg)) {
         return NATIVE_VAL(NUMBER_VAL(AS_LIST(arg)->list.count));
     }

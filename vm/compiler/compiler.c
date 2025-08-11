@@ -1148,7 +1148,7 @@ static void string(Parser* parser, bool canAssign) {
     }
     newString[j] = '\0';
 
-    emitConstant(parser, OBJ_VAL(copyString(parser->vm, newString, strlen(newString))));
+    emitConstant(parser, OBJ_VAL(copyString(parser->vm, newString, j)));
     
     free(newString);
     newString = NULL;

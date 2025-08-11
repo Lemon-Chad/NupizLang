@@ -1,0 +1,26 @@
+import std;
+import iofile;
+
+const lexerPkg = import "./parser/lexer.npz";
+
+func main(args) {
+    if (std.length(args) == 0) {
+        std.println("Expected file path.");
+        return;
+    }
+        
+    const fp = iofile.openFile(args[0], "r");
+    const src = iofile.readFile(fp);
+    iofile.closeFile(fp);
+
+    const lexer = lexerPkg.Lexer(src);
+    let hasError = !lexer.lex();
+    if (hasError) {
+        lexer.printError();
+        return;
+    }
+
+    lexer.printTokens();
+}
+
+std.main(main);

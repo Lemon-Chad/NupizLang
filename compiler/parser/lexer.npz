@@ -1,0 +1,321 @@
+import std;
+import npvec;
+
+unpack import "./token.npz";
+
+class Lexer {
+    let prv src;
+    let prv len;
+    let prv idx;
+    let prv line;
+    let prv col;
+    let prv tokens;
+    let prv current;
+    let prv errorMessage;
+    let prv errored;
+
+    const pub static KEYWORDS = npvec.vec(
+        "break",
+        "build",
+        "class",
+        "const",
+        "continue",
+        "def",
+        "else",
+        "false",
+        "for",
+        "func",
+        "from",
+        "if",
+        "import",
+        "let",
+        "new",
+        "null",
+        "prv",
+        "pub",
+        "return",
+        "static",
+        "super",
+        "this",
+        "true",
+        "unpack",
+        "var",
+        "while"
+    );
+
+    build(oSrc) {
+        src = oSrc;
+        len = std.length(oSrc);
+        idx = 0;
+        current = src[0];
+
+        line = 1;
+        col = 1;
+
+        tokens = npvec.vec();
+        
+        errored = false;
+    }
+
+    func prv setError(msg) {
+        errorMessage = msg;
+        errored = true;
+    }
+
+    func prv isAlpha() {
+        return ("a" <= current && current <= "z") ||
+            ("A" <= current && current <= "Z");
+    }
+
+    func prv isNumeric() {
+        return ("0" <= current && current <= "9");
+    }
+
+    func prv advance() {
+        idx += 1;
+
+        if (current == "\n") {
+            line += 1;
+            col = 1;
+        } else {
+            col += 1;
+        }
+
+        if (idx < len)
+            current = src[idx];
+        else
+            current = "\0";
+    }
+
+    func prv match(target) {
+        if (current == target) {
+            advance();
+            return true;
+        }
+
+        return false;
+    }
+
+    func prv consume(target) {
+        if (current != target) {
+            setError("Expected '" + target + "', found '" + current + "'.");
+            return false;
+        }
+
+        advance();
+        return true;
+    }
+
+    func prv addToken(tokenType, text) {
+        npvec.append(tokens, Token(tokenType, text));
+    }
+
+    func prv lexIdentifier() {
+        const start = idx;
+        while (isAlpha() || isNumeric() || current == "_")
+            advance();
+        
+        const identifier = std.slice(src, start, idx);
+        let tokenType = TokenType.IDENTIFIER;
+        if (npvec.find(Lexer.KEYWORDS, identifier) != -1)
+            tokenType = TokenType.KEYWORD;
+        
+        addToken(tokenType, identifier);
+    }
+
+    func prv lexNumber() {
+        let dot = false;
+        const start = idx;
+        while (isNumeric() || (current == "." && !dot)) {
+            if (current == ".") 
+                dot = true;
+            advance();
+        }
+
+        const number = std.slice(src, start, idx);
+        addToken(TokenType.NUMBER, number);
+    }
+
+    func prv lexString() {
+        let opener = current;
+        
+        advance();
+        let string = "";
+        while (idx < len && current != opener) {
+            if (current != "\\") {
+                string += current;
+                advance();
+                continue;
+            }
+            advance();
+
+            if (idx >= len) {
+                setError("String abruptly terminates.");
+                return false;
+            }
+            
+            // Escape characters
+            if (current == "n") {
+                string += "\n";
+            } else if (current == "t") {
+                string += "\t";
+            } else if (current == "b") {
+                string += "\b";
+            } else if (current == "r") {
+                string += "\r";
+            } else if (current == "a") {
+                string += "\a";
+            } else if (current == "?") {
+                string += "\?";
+            } else if (current == "f") {
+                string += "\f";
+            } else if (current == "v") {
+                string += "\v";
+            } else if (current == "0") {
+                string += "\0";
+            } else {
+                string += current;
+            }
+            advance();
+        }
+
+        if (current != opener) {
+            setError("Expected " + opener + " after string.");
+            return false;
+        }
+        advance();
+
+        addToken(TokenType.STRING, string);
+
+        return true;
+    }
+
+    func prv consumeWhitespace() {
+        while (current == " " || current == "\t" || current == "\n" || current == "\r")
+            advance();
+    }
+
+    func pub lex() {
+        while (idx < len) {
+            consumeWhitespace();
+            if (idx >= len)
+                break;
+
+            if (isAlpha() || current == "_") {
+                lexIdentifier();
+            } else if (isNumeric()) {
+                lexNumber();
+            } else if (current == "\"" || current == "\'") {
+                lexString();
+            }
+
+            // Single character token hell.
+            else if (match("(")) {
+                addToken(TokenType.LPAREN, "(");
+            } else if (match(")")) {
+                addToken(TokenType.RPAREN, ")");
+            } else if (match("[")) {
+                addToken(TokenType.LBRACKET, "[");
+            } else if (match("]")) {
+                addToken(TokenType.RBRACKET, "]");
+            } else if (match("{")) {
+                addToken(TokenType.LBRACE, "{");
+            } else if (match("}")) {
+                addToken(TokenType.RBRACE, "}");
+            } else if (match(",")) {
+                addToken(TokenType.COMMA, ",");
+            } else if (match(".")) {
+                addToken(TokenType.DOT, ".");
+            } else if (match(";")) {
+                addToken(TokenType.SEMICOLON, ";");
+            }
+            // End of single character tokens.
+
+            // Double character token hell.
+            else if (match("+")) {
+                if (match("="))
+                    addToken(TokenType.PLUS_EQUAL, "+=");
+                else
+                    addToken(TokenType.PLUS, "+");
+            } else if (match("-")) {
+                if (match("="))
+                    addToken(TokenType.MINUS_EQUAL, "-=");
+                else if (match(">"))
+                    addToken(TokenType.RIGHT_ARROW, "->");
+                else
+                    addToken(TokenType.MINUS, "-");
+            } else if (match("*")) {
+                if (match("="))
+                    addToken(TokenType.STAR_EQUAL, "*=");
+                else
+                    addToken(TokenType.STAR, "*");
+            } else if (match("/")) {
+                if (match("="))
+                    addToken(TokenType.SLASH_EQUAL, "/=");
+                else
+                    addToken(TokenType.SLASH, "/");
+            } else if (match("=")) {
+                if (match("="))
+                    addToken(TokenType.EQUAL_EQUAL, "==");
+                else
+                    addToken(TokenType.EQUAL, "=");
+            } else if (match("!")) {
+                if (match("="))
+                    addToken(TokenType.BANG_EQUAL, "!=");
+                else
+                    addToken(TokenType.BANG, "!");
+            } else if (match("<")) {
+                if (match("="))
+                    addToken(TokenType.LESS_EQUAL, "<=");
+                else if (match("-"))
+                    addToken(TokenType.LEFT_ARROW, "<-");
+                else
+                    addToken(TokenType.LESS, "<");
+            } else if (match(">")) {
+                if (match("="))
+                    addToken(TokenType.GREATER_EQUAL, ">=");
+                else
+                    addToken(TokenType.GREATER, ">");
+            } else if (match("&")) {
+                if (match("&"))
+                    addToken(TokenType.AND, "&&");
+                else
+                    addToken(TokenType.BINARY_AND, "&");
+            } else if (match("|")) {
+                if (match("|"))
+                    addToken(TokenType.OR, "||");
+                else
+                    addToken(TokenType.BINARY_OR, "|");
+            }
+            // End of double character tokens.
+
+            else {
+                setError("Unknown symbol '" + current + "'.");
+                return false;
+            }
+
+            if (hasError())
+                return false;
+        }
+
+        addToken(TokenType.EOF, "[EOF]");
+
+        return !hasError();
+    }
+
+    func pub printTokens() {
+        std.print("TOKENS: [ ");
+        for (let i = 0; i < npvec.size(tokens); i += 1)
+            std.print("(" + std.asString(npvec.at(tokens, i)) + ") ");
+        std.println("]");
+    }
+
+    func pub hasError() {
+        return errored;
+    }
+
+    func pub printError() {
+        std.println("Error at line " + std.asString(line) + " col " + std.asString(col) + ": ");
+        std.println("\t-- " + std.asString(errorMessage));
+    }
+}

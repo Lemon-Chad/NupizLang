@@ -1,0 +1,94 @@
+
+class TokenType {
+    const pub static IDENTIFIER     =   0;
+    const pub static KEYWORD        =   1;
+    const pub static LPAREN         =   2;
+    const pub static RPAREN         =   3;
+    const pub static LBRACKET       =   4;
+    const pub static RBRACKET       =   5;
+    const pub static PLUS           =   6;
+    const pub static MINUS          =   7;
+    const pub static STAR           =   8;
+    const pub static SLASH          =   9;
+    const pub static NUMBER         =  10;
+    const pub static STRING         =  11;
+    const pub static LBRACE         =  12;
+    const pub static RBRACE         =  13;
+    const pub static COMMA          =  14;
+    const pub static DOT            =  15;
+    const pub static SEMICOLON      =  16;
+    const pub static PLUS_EQUAL     =  17;
+    const pub static MINUS_EQUAL    =  18;
+    const pub static STAR_EQUAL     =  19;
+    const pub static SLASH_EQUAL    =  20;
+    const pub static EQUAL          =  21;
+    const pub static EQUAL_EQUAL    =  22;
+    const pub static BANG           =  23;
+    const pub static BANG_EQUAL     =  24;
+    const pub static LESS           =  25;
+    const pub static LESS_EQUAL     =  26;
+    const pub static LEFT_ARROW     =  27;
+    const pub static GREATER        =  28;
+    const pub static GREATER_EQUAL  =  29;
+    const pub static RIGHT_ARROW    =  30;
+    const pub static AND            =  31;
+    const pub static BINARY_AND     =  32;
+    const pub static OR             =  33;
+    const pub static BINARY_OR      =  34;
+    const pub static EOF            =  35;
+
+    func pub static toString(tokenType) {
+        return [
+            "IDENTIFIER", 
+            "KEYWORD", 
+            "LPAREN",
+            "RPAREN",
+            "LBRACKET",
+            "RBRACKET",
+            "PLUS",
+            "MINUS",
+            "STAR",
+            "SLASH",
+            "NUMBER",
+            "STRING",
+            "LBRACE",
+            "RBRACE",
+            "COMMA",
+            "DOT",
+            "SEMICOLON",
+            "PLUS_EQUAL",
+            "MINUS_EQUAL",
+            "STAR_EQUAL",
+            "SLASH_EQUAL",
+            "EQUAL",
+            "EQUAL_EQUAL",
+            "BANG",
+            "BANG_EQUAL",
+            "LESS",
+            "LESS_EQUAL",
+            "LEFT_ARROW",
+            "GREATER",
+            "GREATER_EQUAL",
+            "RIGHT_ARROW",
+            "AND",
+            "BINARY_AND",
+            "OR",
+            "BINARY_OR",
+            "EOF"
+        ][tokenType];
+    }
+}
+
+class Token {
+    let pub tokenType;
+    let pub text;
+    
+    build(tokenType, text) {
+        this.tokenType = tokenType;
+        this.text = text;
+    }
+
+    func def string() {
+        return TokenType.toString(tokenType) + ":'" + text + "'"; 
+    }
+}

@@ -933,6 +933,17 @@ InterpretResult run(VM* vm) {
                         return INTERPRET_RUNTIME_ERR;
                     }
                     push(vm, lst->list.values[idx]);
+                } else if (IS_STRING(a) && IS_NUMBER(b)) {
+                    ObjString* str = AS_STRING(a);
+                    int idx = (int) AS_NUMBER(b);
+                    if (idx < 0)
+                        idx += str->length;
+                    
+                    if (idx >= str->length || idx < 0) {
+                        runtimeError(vm, "Index out of bounds.");
+                        return INTERPRET_RUNTIME_ERR;
+                    }
+                    push(vm, OBJ_VAL(copyString(vm, str->chars + idx, 1)));
                 } else {
                     runtimeError(vm, "Invalid index getting operation recipients.");
                     return INTERPRET_RUNTIME_ERR;

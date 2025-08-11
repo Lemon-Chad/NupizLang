@@ -128,6 +128,9 @@ static bool getBound(VM* vm, Value bound, ObjString* name) {
                     return false;
                 }
 
+                if (IS_CLASS(val))
+                    AS_CLASS(val)->bound = bound;
+
                 push(vm, val);
                 return true;
             }
@@ -640,6 +643,16 @@ InterpretResult run(VM* vm) {
                     runtimeError(vm, "Global variable '%s' is undefined.", name->chars);
                     return INTERPRET_RUNTIME_ERR;
                 }
+
+                if (IS_CLASS(val)) {
+                    if (IS_NAMESPACE(frame->bound))
+                        AS_CLASS(val)->bound = frame->bound;
+                    else if (IS_CLASS(frame->bound))
+                        AS_CLASS(val)->bound = AS_CLASS(frame->bound)->bound;
+                    else if (IS_INSTANCE(frame->bound))
+                        AS_CLASS(val)->bound = AS_INSTANCE(frame->bound)->bound;
+                }
+
                 push(vm, val);
                 break;
             }

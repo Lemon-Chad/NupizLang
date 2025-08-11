@@ -990,11 +990,17 @@ static void importFile(Parser* parser) {
 
     char* src = readFile(filename->chars);
 
+    char* cwd = getCurrentWorkingDirectory();
+    changeDirectoryToFile(filename->chars);
+
     VM temp;
 
     initVM(&temp);
     ObjFunction* func = compile(&temp, src);
     decoupleVM(&temp);
+
+    changeDirectory(cwd);
+    free(cwd);
 
     if (func == NULL) {
         error(parser, "Failed to import file.");

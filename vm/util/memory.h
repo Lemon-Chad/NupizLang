@@ -32,5 +32,7 @@ void collectGarbage(VM* vm);
 char* readFile(char* path);
 char* getDirectory(char* path);
 void changeDirectory(char* path);
+void changeDirectoryToFile(char* path);
+char* getCurrentWorkingDirectory();
 
 #endif

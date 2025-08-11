@@ -157,7 +157,7 @@ int main(int argc, const char* argv[]) {
 
         vm.argv = argv + 3;
         vm.argc = argc - 3;
-        changeDirectory(argv[2]);
+        changeDirectoryToFile(argv[2]);
         runFile(&vm, argv[2]);
         return 0;
     }
@@ -230,12 +230,12 @@ int main(int argc, const char* argv[]) {
             exit(2);
         }
 
-        changeDirectory(compileTarget);
+        changeDirectoryToFile(compileTarget);
         compileFile(&vm, compileTarget, outputTarget);
     }
 
     if (HAS_FLAG(flags, FLAG_RUN)) {
-        changeDirectory(runTarget);
+        changeDirectoryToFile(runTarget);
         runFile(&vm, runTarget);
     }
     

@@ -379,7 +379,21 @@ char* getDirectory(char* path) {
 }
 
 void changeDirectory(char* path) {
-    path = getDirectory(path);
     chdir(path);
+}
+
+void changeDirectoryToFile(char* path) {
+    path = getDirectory(path);
+    changeDirectory(path);
     free(path);
+}
+
+char* getCurrentWorkingDirectory() {
+    char* buffer;
+    buffer = getcwd(NULL, 0);
+    if (buffer == NULL) {
+        fprintf(stderr, "RAN OUT OF MEMORY TO ALLOCATE CWD.\n");
+        exit(1);
+    }
+    return buffer;
 }

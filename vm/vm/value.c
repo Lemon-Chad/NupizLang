@@ -79,7 +79,8 @@ bool valuesEqual(VM* vm, Value a, Value b)
         case VAL_OBJ: {
             if (IS_INSTANCE(a))
                 return eqInstance(vm, AS_INSTANCE(a), b);
-            
+            if (IS_STRING(a) && IS_STRING(b))
+                return strcmp(AS_CSTRING(a), AS_CSTRING(b)) == 0;
             return AS_OBJ(a) == AS_OBJ(b);
         }
         default:

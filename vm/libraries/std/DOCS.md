@@ -18,6 +18,7 @@ Standard library for Nupiz.
 - [main](#main)
 - [slice](#slice)
 - [find](#find)
+- [split](#split)
 
 ## print
 
@@ -96,3 +97,9 @@ Returns a copy of the given string from indices `[start:end)`. Accepts negative 
 `std.find(list, ele)`
 
 Returns the index of the given element in the list. If the element is not in the list, returns -1.
+
+## split
+
+`std.split(string, delimiter)`
+
+Splits a string into a list of substrings each time the delimiter is encountered.

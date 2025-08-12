@@ -208,6 +208,38 @@ static NativeResult findNative(VM* vm, int argc, Value* args) {
     return NATIVE_VAL(NUMBER_VAL(-1));
 }
 
+static NativeResult splitNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 2))
+        return NATIVE_FAIL;
+    if (!IS_STRING(args[0])) {
+        runtimeError(vm, "Expected string as first argument.");
+        return NATIVE_FAIL;
+    }
+    if (!IS_STRING(args[1])) {
+        runtimeError(vm, "Expected string as second argument.");
+        return NATIVE_FAIL;
+    }
+
+    ObjString* string = AS_STRING(args[0]);
+    ObjString* delim = AS_STRING(args[1]);
+
+    ObjList* lst = newList(vm);
+    push(vm, OBJ_VAL(lst));
+
+    char* idx = string->chars;
+    for (char* i = string->chars; i <= string->chars + string->length - delim->length; i++) {
+        if (memcmp(i, delim->chars, delim->length) == 0) {
+            writeValueArray(vm, &lst->list, OBJ_VAL(copyString(vm, idx, i - idx)));
+            i += delim->length - 1;
+            idx = i + 1;
+        }
+    }
+    writeValueArray(vm, &lst->list, OBJ_VAL(copyString(vm, idx, string->chars + string->length - idx)));
+
+    pop(vm);
+    return NATIVE_VAL(OBJ_VAL(lst));
+}
+
 bool importNPLib(VM* vm, ObjString* lib) {
     LIBFUNC("print", printNative);
     LIBFUNC("println", printlnNative);
@@ -222,6 +254,7 @@ bool importNPLib(VM* vm, ObjString* lib) {
     LIBFUNC("main", mainNative);
     LIBFUNC("slice", sliceNative);
     LIBFUNC("find", findNative);
+    LIBFUNC("split", splitNative);
 
     return true;
 }

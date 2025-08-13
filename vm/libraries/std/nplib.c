@@ -240,6 +240,43 @@ static NativeResult splitNative(VM* vm, int argc, Value* args) {
     return NATIVE_VAL(OBJ_VAL(lst));
 }
 
+static NativeResult repeatNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 2))
+        return NATIVE_FAIL;
+    if (!IS_STRING(args[0])) {
+        runtimeError(vm, "Expected string as first argument.");
+        return NATIVE_FAIL;
+    }
+    if (!IS_NUMBER(args[1])) {
+        runtimeError(vm, "Expected integer as second argument.");
+        return NATIVE_FAIL;
+    }
+
+    ObjString* string = AS_STRING(args[0]);
+    int count = (int) AS_NUMBER(args[1]);
+    if (count == 0)
+        return NATIVE_VAL(OBJ_VAL(formatString(vm, "")));
+    if (count < 0) {
+        runtimeError(vm, "Repetition count must be non-negative.");
+        return NATIVE_FAIL;
+    }
+
+    char* repeated = ALLOCATE(vm, char, string->length * count + 1);
+    for (int i = 0; i < count; i++) {
+        memcpy(repeated + string->length * i, string->chars, string->length);
+    }
+    repeated[string->length * count] = '\0';
+
+    // "abc"\0 * 3
+    // length = 3
+
+    // "abcabcabc"\0
+    // allocated length = 10
+    // @ 0idx 9 = '\0'
+
+    return NATIVE_VAL(OBJ_VAL(takeString(vm, repeated, string->length * count)));
+}
+
 bool importNPLib(VM* vm, ObjString* lib) {
     LIBFUNC("print", printNative);
     LIBFUNC("println", printlnNative);
@@ -255,6 +292,7 @@ bool importNPLib(VM* vm, ObjString* lib) {
     LIBFUNC("slice", sliceNative);
     LIBFUNC("find", findNative);
     LIBFUNC("split", splitNative);
+    LIBFUNC("repeat", repeatNative);
 
     return true;
 }

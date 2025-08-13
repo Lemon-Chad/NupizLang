@@ -19,6 +19,7 @@ Standard library for Nupiz.
 - [slice](#slice)
 - [find](#find)
 - [split](#split)
+- [repeat](#repeat)
 
 ## print
 
@@ -103,3 +104,9 @@ Returns the index of the given element in the list. If the element is not in the
 `std.split(string, delimiter)`
 
 Splits a string into a list of substrings each time the delimiter is encountered.
+
+## repeat
+
+`std.repeat(string, count)`
+
+Returns a new string with the given string concatenated in a row as many times as given. Count must be non-negative.

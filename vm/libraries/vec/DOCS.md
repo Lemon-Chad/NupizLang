@@ -23,9 +23,9 @@ Returns a vector with all of the arguments as elements.
 
 ## vecFrom
 
-`vecFrom(list)`
+`vecFrom(obj)`
 
-Returns a vector with all of the elements of the given list as the elements of the new vector.
+Returns a vector with all of the elements of the given list or string as the elements of the new vector.
 
 ## at
 

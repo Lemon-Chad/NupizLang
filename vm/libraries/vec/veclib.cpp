@@ -17,13 +17,21 @@ static NativeResult vecFromNative(VM* vm, int argc, Value* args) {
     if (!expectArgs(vm, argc, 1)) {
         return NATIVE_FAIL;
     }
-    if (!IS_LIST(args[0])) {
-        runtimeError(vm, "Expected list as argument.");
+
+    std::vector<Value>* vec;
+    if (IS_STRING(args[0])) {
+        ObjString* str = AS_STRING(args[0]);
+        vec = new std::vector<Value>(str->length);
+        for (int i = 0; i < str->length; i++)
+            (*vec)[i] = OBJ_VAL(formatString(vm, "%c", str->chars[i]));
+    } else if (IS_LIST(args[0])) {
+        ValueArray* list = &AS_LIST(args[0])->list;
+        vec = new std::vector<Value>(list->values, list->values + list->count);
+    } else {
+        runtimeError(vm, "Expected list or string as argument.");
         return NATIVE_FAIL;
     }
 
-    ValueArray* list = &AS_LIST(args[0])->list;
-    std::vector<Value>* vec = new std::vector<Value>(list->values, list->values + list->count);
     ObjPtr* ptr = newNPVector(vm, vec);
     return NATIVE_VAL(OBJ_VAL(ptr));
 }

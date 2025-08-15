@@ -1,0 +1,119 @@
+import std;
+const formatPkg = import "../util/formatting.npz";
+
+class Error {
+    let pub filename;
+    let pub src;
+    let pub idx;
+    let pub len;
+
+    let pub name;
+    let pub desc;
+
+    build(filename, src, idx, len, name, desc) {
+        this.filename = filename;
+        this.src = src;
+        this.idx = idx;
+        this.len = len;
+
+        this.name = name;
+        this.desc = desc;
+    }
+
+    func def string() {
+        if (idx == -1 || len == -1) {
+            return name + ": " + desc;
+        }
+
+        const line = formatPkg.idxToLine(src, idx);
+        return name + ": " + desc + "\n" +
+            "File " + filename + ", line " + 
+            std.asString(line) + "\n" +
+            formatPkg.addMargin(formatPkg.numberSnippetLines(
+                formatPkg.underlineCode(src, idx, len),
+                line
+            ), "  ");
+    }
+
+    func static IllegalCharError(filename, src, idx, len, desc) {
+        return Error(filename, src, idx, len, "Illegal Character", desc);
+    }
+
+    func static ExpectedCharError(filename, src, idx, len, desc) {
+        return Error(filename, src, idx, len, "Expected Character", desc);
+    }
+
+    func static InvalidSyntax(filename, src, idx, len, desc) {
+        return Error(filename, src, idx, len, "Invalid Syntax", desc);
+    }
+}
+
+class Tip <- Error {
+    let pub tip;
+
+    build(filename, src, idx, len, name, desc, tip) {
+        this.filename = filename;
+        this.src = src;
+        this.idx = idx;
+        this.len = len;
+
+        this.name = name;
+        this.desc = desc;
+        this.tip = tip;
+    }
+
+    func def string() {
+        if (idx == -1 || len == -1) {
+            return name + ": " + desc;
+        }
+
+        return super.string() + "\nExample:\n" + tip + "\n";
+    }
+}
+
+class ParseResult {
+    let pub val;
+    let pub error;
+    let pub advances;
+    let pub reverses;
+
+    build() {
+        val = null;
+        error = null;
+        advances = 0;
+        reverses = 0;
+    }
+
+    func pub advance() {
+        advances += 1;
+    }
+
+    func pub tryRegister(res) {
+        if (res.error != null) {
+            error = res.error;
+            reverses += res.advances;
+            return null;
+        }
+
+        return register(res);
+    }
+
+    func pub register(res) {
+        advance += res.advances;
+        if (res.error != null) {
+            error = res.error;
+        }
+        return res.val;
+    }
+
+    func pub success(val) {
+        this.val = val;
+        return this;
+    }
+
+    func pub failure(error) {
+        if (this.error == null || advances == 0)
+            this.error = error;
+        return this;
+    }
+}

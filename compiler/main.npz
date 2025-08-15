@@ -1,7 +1,10 @@
 import std;
 import iofile;
 
-const lexerPkg = import "./parser/lexer.npz";
+const lexerPkg = import "./lexer/lexer.npz";
+const parserPkg = import "./parser/parser.npz";
+const formatPkg = import "./util/formatting.npz";
+const resPkg = import "./parser/result.npz";
 
 func main(args) {
     if (std.length(args) == 0) {
@@ -11,16 +14,21 @@ func main(args) {
         
     const fp = iofile.openFile(args[0], "r");
     const src = iofile.readFile(fp);
+    const filename = formatPkg.getFilename(args[0]);
     iofile.closeFile(fp);
 
-    const lexer = lexerPkg.Lexer(src);
+    const lexer = lexerPkg.Lexer(filename, src);
     let hasError = !lexer.lex();
     if (hasError) {
         lexer.printError();
         return;
     }
 
-    lexer.printTokens();
+    // lexer.printTokens();
+
+    std.println(std.asString(resPkg.Error.InvalidSyntax(
+        filename, src, 40, 45, "Your code looks dumb."
+    )));
 }
 
 std.main(main);

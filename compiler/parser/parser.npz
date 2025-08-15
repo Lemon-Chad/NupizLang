@@ -1,0 +1,43 @@
+import std;
+import npvec;
+
+unpack import "./conventions.npz";
+
+class Parser {
+    let prv current;
+    let prv tokens;
+    let prv idx;
+    let prv len;
+
+    build(toks) {
+        tokens = toks;
+
+        idx = 0;
+        len = npvec.size(tokens);
+        current = npvec.at(toks, 0);
+    }
+
+    func prv updateTok() {
+        if (0 <= idx && idx < len)
+            current = npvec.at(tokens, idx);
+    }
+
+    func prv advance() {
+        idx += 1;
+        updateTok();
+    }
+
+    func prv peek(dist) {
+        if (0 <= idx + dist && idx + dist < len)
+            return npvec.at(tokens, idx + dist);
+        return null;
+    }
+
+    func prv reverse(dist) {
+        idx -= dist;
+        updateTok();
+    }
+
+    
+
+}

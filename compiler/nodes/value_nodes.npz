@@ -1,0 +1,83 @@
+import std;
+import npvec;
+unpack import "./node.npz";
+
+class BooleanNode <- Node {
+    let prv value;
+
+    build(val) {
+        value = val;
+        type = NodeType.BOOLEAN;
+    }
+
+    func def string() {
+        return std.asString(value);
+    }
+}
+
+class NumberNode <- Node {
+    let prv value;
+
+    build(val) {
+        value = val;
+        type = NodeType.NUMBER;
+    }
+
+    func def string() {
+        return std.asString(value);
+    }
+}
+
+class NullNode <- Node {
+    build() {
+        type = NodeType.NULL;
+    }
+
+    func def string() {
+        return "null";
+    }
+}
+
+class StringNode <- Node {
+    let prv value;
+
+    build(val) {
+        value = val;
+        type = NodeType.STRING;
+    }
+
+    func def string() {
+        return value;
+    }
+}
+
+class ListNode <- Node {
+    let prv value;
+
+    build(val) {
+        value = val;
+        type = NodeType.LIST;
+    }
+
+    func def string() {
+        let str = "[";
+        const n = npvec.size(value);
+
+        for (int i = 0; i < n; i += 1) {
+            const k = npvec.at(value, i);
+
+            if (k.getType() == NodeType.STRING) {
+                str += "\"" + std.asString(k) + "\"";
+            } else {
+                str += std.asString(k);
+            }
+
+            if (i < n - 1)
+                str += ", ";
+        }
+
+        str += "]";
+
+        return str;
+    }
+}

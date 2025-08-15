@@ -5,6 +5,7 @@ unpack import "./token.npz";
 
 class Lexer {
     let prv src;
+    let prv filename;
     let prv len;
     let prv idx;
     let prv line;
@@ -43,7 +44,8 @@ class Lexer {
         "while"
     );
 
-    build(oSrc) {
+    build(oFilename, oSrc) {
+        filename = oFilename;
         src = oSrc;
         len = std.length(oSrc);
         idx = 0;
@@ -107,7 +109,11 @@ class Lexer {
     }
 
     func prv addToken(tokenType, text) {
-        npvec.append(tokens, Token(tokenType, text));
+        const tok = Token(tokenType, text);
+        const n = std.length(text);
+        tok.setSource(src, filename);
+        tok.setPosition(idx - n, n, line, col - n);
+        npvec.append(tokens, tok);
     }
 
     func prv lexIdentifier() {
@@ -305,9 +311,16 @@ class Lexer {
 
     func pub printTokens() {
         std.print("TOKENS: [ ");
-        for (let i = 0; i < npvec.size(tokens); i += 1)
-            std.print("(" + std.asString(npvec.at(tokens, i)) + ") ");
+        for (let i = 0; i < npvec.size(tokens); i += 1) {
+            const tok = npvec.at(tokens, i);
+            const str = std.asString(tok);
+            std.print("(" + str + ") ");
+        }
         std.println("]");
+    }
+
+    func pub getTokens() {
+        return tokens;
     }
 
     func pub hasError() {

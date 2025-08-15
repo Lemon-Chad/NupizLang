@@ -1,0 +1,71 @@
+import std;
+
+class NamingConvention {
+    const pub static CAMEL_CASE = 0;
+    const pub static SCREAMING_SNAKE_CASE = 1;
+    const pub static PASCAL_CASE = 2;
+    const pub static SNAKE_CASE = 3;
+    const pub static MIXED_SNAKE_CASE = 4;
+    const pub static NONE = 5;
+
+    func pub static stringConvention(conv) {
+        if (conv == CAMEL_CASE)
+            return "camelCase";
+        if (conv == SCREAMING_SNAKE_CASE)
+            return "SCREAMING_SNAKE_CASE";
+        if (conv == PASCAL_CASE)
+            return "PascalCase";
+        if (conv == SNAKE_CASE)
+            return "snake_case";
+        if (conv == MIXED_SNAKE_CASE)
+            return "Mixed_Snake_Case";
+        if (conv == NONE)
+            return "lowercase";
+    }
+
+    func pub static detectConvention(text) {
+        if (text == "_")
+            return NamingConvention.NONE;
+        
+        let uppercase = 0;
+        let lowercase = 0;
+        let underscores = 0;
+        const n = std.length(text);
+
+        for (let i = 0; i < n; i += 1) {
+            if ("A" <= text[i] && text[i] <= "Z")
+                uppercase += 1;
+            else if ("a" <= text[i] && text[i] <= "z")
+                lowercase += 1;
+            else if (text[i] == "_")
+                underscores += 1;
+        }
+
+        if (underscores > 0) {
+            if (uppercase == 0)
+                return NamingConvention.SNAKE_CASE;
+            if (lowercase == 0 && uppercase > 0)
+                return NamingConvention.SCREAMING_SNAKE_CASE;
+            return NamingConvention.MIXED_SNAKE_CASE;
+        }
+        
+        if (lowercase == 0 && uppercase > 1)
+            return NamingConvention.SCREAMING_SNAKE_CASE;
+        
+        if ("A" <= text[0] && text[0] <= "Z")
+            return NamingConvention.PASCAL_CASE;
+        
+        if (uppercase > 0)
+            return NamingConvention.CAMEL_CASE;
+        
+        return NamingConvention.NONE;
+    }
+
+    func pub static conventionMatches(convA, convB) {
+        if (convB == NamingConvention.SCREAMING_SNAKE_CASE || convB == NamingConvention.PASCAL_CASE)
+            return convA == convB;
+        if (a == NamingConvention.NONE || b == NamingConvention.NONE)
+            return true;
+        return convA == convB;
+    }
+}

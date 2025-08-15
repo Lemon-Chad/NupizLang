@@ -1,0 +1,21 @@
+import npvec;
+
+class NodeType {
+    const pub static NUMBER         =   0;
+    const pub static BOOLEAN        =   1;
+    const pub static NULL           =   2;
+    const pub static LIST           =   3;
+    const pub static STRING         =   4;
+}
+
+class Node {
+    let prv type;
+
+    func pub getChildren() {
+        return npvec.vec();
+    }
+
+    func pub getType() {
+        return type;
+    }
+}

@@ -82,10 +82,37 @@ class TokenType {
 class Token {
     let pub tokenType;
     let pub text;
+
+    let pub idx;
+    let pub len;
+    let pub line;
+    let pub col;
+    let pub src;
+    let pub filename;
     
     build(tokenType, text) {
         this.tokenType = tokenType;
         this.text = text;
+
+        idx = 0;
+        len = 0;
+        line = 0;
+        col = 0;
+        src = "";
+        filename = "";
+    }
+
+    func pub setSource(src, filename) {
+        this.src = src;
+        this.filename = filename;
+    }
+
+    func pub setPosition(idx, len, line, col) {
+        this.idx = idx;
+        this.len = len;
+
+        this.line = line;
+        this.col = col;
     }
 
     func def string() {

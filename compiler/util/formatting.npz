@@ -1,0 +1,148 @@
+import std;
+import npvec;
+
+const FANCY_MODE = true;
+
+func idxToLine(src, idx) {
+    return std.length(std.split(std.slice(src, 0, idx), "\n")) - 1;
+}
+
+func lineToIdx(src, line) {
+    const lines = std.split(src, "\n");
+    const n = std.length(lines);
+
+    let idx = 0;
+    for (let i = 0; i < line; i += 1) {
+        idx += std.length(lines[i]) + 1;
+    }
+
+    return idx;
+}
+
+func findLineStart(src, idx) {
+    return lineToIdx(src, idxToLine(src, idx));
+}
+
+func findLineEnd(src, idx) {
+    return lineToIdx(src, idxToLine(src, idx) + 1) - 1;
+}
+
+func codeSnippet(src, idx, len) {
+    return std.slice(src, findLineStart(src, idx), findLineEnd(src, idx + len));
+}
+
+func highlightBar(len) {
+    if (len <= 0) return "";
+
+    if (len >= 2) {
+        if (FANCY_MODE)
+            return "╰" + std.repeat("─", len - 2) + "╯";
+        else
+            return "\\" + std.repeat("_", len - 2) + "/";
+    }
+
+    return "^";
+}
+
+func isWhitespace(char) {
+    return char == " " || char == "\t" || char == "\n" || char == "\r";
+}
+
+func getMargin(text) {
+    let margin = "";
+    const n = std.length(text);
+    for (let i = 0; i < n && isWhitespace(text[i]); i += 1)
+        margin += text[i];
+    return margin;
+}
+
+func leftAlign(text) {
+    const lines = std.split(text, "\n");
+    const n = std.length(lines);
+    let margin = -1;
+    for (let i = 0; i < n; i += 1) {
+        const line = lines[i];
+        const currentMargin = std.length(getMargin(line));
+        
+        if (margin == -1 || (currentMargin < margin 
+                && currentMargin < std.length(line)))
+            margin = currentMargin;
+    }
+
+    let res = "";
+    for (let i = 0; i < n; i += 1)
+        res += std.slice(lines[i], margin, -1) + "\n";
+    
+    return std.slice(res, 0, -2);
+}
+
+func numberSnippetLines(src, start) {
+    const lines = std.split(src, "\n");
+    const n = std.length(lines);
+    const numLength = std.length(std.asString(start + n));
+    
+    let res = "";
+    for (let i = 0; i < n; i += 1)
+        res += std.repeat(" ", numLength - std.length(std.asString(i + start))) + 
+            std.asString(i + start) + ":: " + lines[i] + "\n";
+    return std.slice(res, 0, -2);
+}
+
+func addMargin(src, margin) {
+    const lines = std.split(src, "\n");
+    const n = std.length(lines);
+    
+    let res = "";
+    for (let i = 0; i < n; i += 1)
+        res += margin + lines[i] + "\n";
+    return std.slice(res, 0, -2);
+}
+
+func underlineCode(src, idx, len) {
+    const start = findLineStart(src, idx);
+    const end = findLineEnd(src, idx + len);
+    const snippet = codeSnippet(src, idx, len);
+
+    const lines = std.split(snippet, "\n");
+    const n = std.length(lines);
+
+    if (n == 1) {
+        const line = lines[0];
+        const margin = getMargin(line);
+        const marginLength = std.length(margin);
+        std.println(end);
+
+        return line + "\n" + margin + 
+            std.repeat(" ", idx - (start + marginLength)) + 
+            highlightBar(len);
+    }
+
+    let res = "";
+    let j = start;
+    for (let i = 0; i < n; i += 1) {
+        const line = lines[i];
+        const lineLength = std.length(line);
+
+        const margin = getMargin(line);
+        const marginLength = std.length(margin);
+
+        res += line + "\n" + margin;
+        if (j + marginLength < idx) {
+            res += std.repeat(" ", idx - (j + marginLength)) + 
+                highlightBar(j + lineLength - idx);
+        } else if (j + lineLength > idx + len) {
+            res += highlightBar(idx + len - (j + marginLength));
+        } else {
+            res += highlightBar(lineLength - marginLength);
+        }
+
+        res += "\n";
+        j += lineLength + 1;
+    }
+
+    return leftAlign(std.slice(res, 0, -2));
+}
+
+func getFilename(path) {
+    return std.split(path, "/")[-1];
+}

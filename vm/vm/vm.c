@@ -901,8 +901,6 @@ InterpretResult run(VM* vm) {
                 for (int i = 0; i < DEFAULT_METHOD_COUNT; i++)
                     subclass->defaultMethods[i] = superclass->defaultMethods[i];
                 tableAddAll(vm, &superclass->fields, &subclass->fields);
-                for (int i = 0; i < DEFAULT_METHOD_COUNT; i++)
-                    subclass->defaultMethods[i] = superclass->defaultMethods[i];    
 
                 pop(vm);
                 break;

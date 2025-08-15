@@ -775,11 +775,11 @@ static void classDeclaration(Parser* parser) {
     }
     consume(parser, TOKEN_RIGHT_BRACE, "Expected '}' after class body.");
 
+    emitByte(parser, OP_POP);
+    
     if (classCompiler.hasSuperclass) {
         endScope(parser);
     }
-
-    emitByte(parser, OP_POP);
 
     parser->classCompiler = classCompiler.enclosing;
 }

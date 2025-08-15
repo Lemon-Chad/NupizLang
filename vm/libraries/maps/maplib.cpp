@@ -16,8 +16,7 @@ static NativeResult mapNative(VM* vm, int argc, Value* args) {
         return NATIVE_FAIL;
     }
 
-    std::unordered_map<HashValue, Value, ValueHash>* map = 
-        new std::unordered_map<HashValue, Value, ValueHash>;
+    unordered_valmap* map = new unordered_valmap;
     for (int i = 0; i < argc; i += 2) {
         map->emplace(HASHVALUE(args[i], vm), args[i + 1]);
     }

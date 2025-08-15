@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "../util/table.h"
 #include "../vm/value.h"
 
 struct BytecodeLoader {
@@ -19,6 +20,7 @@ struct BytecodeLoader {
 BytecodeLoader* newLoader(VM* vm, uint8_t* bytes, int length);
 void freeLoader(VM* vm, BytecodeLoader* loader);
 
+Table readTable(BytecodeLoader* loader);
 ObjFunction* readBytecode(BytecodeLoader* loader);
 
 #endif

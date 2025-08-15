@@ -205,7 +205,6 @@ static void emitConstant(Parser* parser, Value val) {
 static void initCompiler(Compiler* compiler, Parser* parser, FunctionType type) {
     compiler->enclosing = parser->compiler;
     parser->compiler = compiler;
-    parser->vm->compiler = compiler;
 
     compiler->localCount = 0;
     compiler->scopeDepth = 0;
@@ -214,6 +213,8 @@ static void initCompiler(Compiler* compiler, Parser* parser, FunctionType type) 
 
     compiler->function = newFunction(parser->vm);
     compiler->type = type;
+
+    parser->vm->compiler = compiler;
 
     Local* local = &compiler->locals[compiler->localCount++];
     local->depth = 0;
@@ -241,7 +242,7 @@ static ObjFunction* endCompiler(Parser* parser) {
             disassembleChunk(currentChunk(parser), func->name == NULL ? "<script>" : func->name->chars);
         }
     #endif
-        
+    
     parser->compiler = parser->compiler->enclosing;
     parser->vm->compiler = parser->compiler;
 
@@ -997,6 +998,7 @@ static void importFile(Parser* parser) {
 
     initVM(&temp);
     ObjFunction* func = compile(&temp, src);
+    push(parser->vm, OBJ_VAL(func));
     decoupleVM(&temp);
 
     changeDirectory(cwd);
@@ -1008,6 +1010,7 @@ static void importFile(Parser* parser) {
     }
     
     emitConstant(parser, OBJ_VAL(func));
+    pop(parser->vm);
     emitByte(parser, OP_IMPORT_FILE);
 }
 

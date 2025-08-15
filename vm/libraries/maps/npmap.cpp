@@ -17,7 +17,7 @@ static void blackenNPMap(VM* vm, ObjPtr* ptr) {
     }
 }
 
-ObjPtr* newNPMap(VM* vm, std::unordered_map<HashValue, Value, ValueHash>* map) {
+ObjPtr* newNPMap(VM* vm, unordered_valmap* map) {
     NPMap* npmap = ALLOCATE(vm, NPMap, 1);
     npmap->map = map;
 

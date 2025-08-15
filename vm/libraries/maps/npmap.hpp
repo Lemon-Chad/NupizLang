@@ -9,8 +9,10 @@ extern "C" {
 #include "../core/extension.h"
 #include "../../util/hashvalue.hpp"
 
+typedef std::unordered_map<HashValue, Value, ValueHash> unordered_valmap;
+
 typedef struct {
-    std::unordered_map<HashValue, Value, ValueHash>* map;
+    unordered_valmap* map;
 } NPMap;
 
 static const char* npmapPtrOrigin = "nupiz.map";
@@ -19,7 +21,7 @@ static const char* npmapPtrOrigin = "nupiz.map";
     AS_PTR(val)->typeEncoding == 0)
 #define AS_NPMAP(val) ((NPMap*) AS_PTR(val)->ptr)
 
-ObjPtr* newNPMap(VM* vm, std::unordered_map<HashValue, Value, ValueHash>* map);
+ObjPtr* newNPMap(VM* vm, unordered_valmap* map);
 
 }
 

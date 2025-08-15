@@ -75,6 +75,7 @@ static void dumpFile(VM* vm, ObjFunction* func, char* path) {
     }
 
     DumpedBytes* bytes = dumpFunction(vm, func);
+
     if (!dumpBytes(fp, bytes)) {
         fprintf(stderr, "Failed to write to file \"%s\".\n", path);
         exit(74);
@@ -91,6 +92,7 @@ static ObjFunction* loadFile(VM* vm, char* path) {
 
     vm->pauseGC++;
     BytecodeLoader* loader = newLoader(vm, src, length);
+
     ObjFunction* func = readBytecode(loader);
     freeLoader(vm, loader);
     vm->pauseGC--;
@@ -105,13 +107,18 @@ static void compileFile(VM* vm, char* srcPath, char* destPath) {
     if (func == NULL)
         exit(65);
 
+    vm->pauseGC++;
     dumpFile(vm, func, destPath);
+    vm->pauseGC--;
     free(src);
 }
 
 static void runFile(VM* vm, char* path) {
     ObjFunction* func = loadFile(vm, path);
+
+    vm->keepTop++;
     InterpretResult res = runFunc(vm, func);
+    vm->keepTop--;
 
     if (res == INTERPRET_COMPILE_ERR) exit(65);
     if (res == INTERPRET_RUNTIME_ERR) exit(70);
@@ -124,9 +131,12 @@ static void runFile(VM* vm, char* path) {
 
         ObjList* lst = newList(vm);
         push(vm, OBJ_VAL(lst));
-        for (int i = 0; i < vm->argc; i++)
-            writeValueArray(vm, &lst->list, 
-                OBJ_VAL(copyString(vm, vm->argv[i], strlen(vm->argv[i]))));
+        for (int i = 0; i < vm->argc; i++) {
+            Value str = OBJ_VAL(copyString(vm, vm->argv[i], strlen(vm->argv[i])));
+            push(vm, str);
+            writeValueArray(vm, &lst->list, str);
+            pop(vm);
+        }
 
         callFunc(vm, clos, 1, NULL_VAL);
 
@@ -135,6 +145,7 @@ static void runFile(VM* vm, char* path) {
         if (res == INTERPRET_COMPILE_ERR) exit(65);
         if (res == INTERPRET_RUNTIME_ERR) exit(70);
     }
+    pop(vm);
 }
 
 int main(int argc, const char* argv[]) {

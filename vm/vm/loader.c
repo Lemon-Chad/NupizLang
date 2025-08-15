@@ -228,7 +228,6 @@ static ObjNamespace* readNamespace(BytecodeLoader* loader) {
     ObjNamespace* nspace = newNamespace(loader->vm, name);
 
     int length = readInt(loader);
-    printf("len: %d\n", length);
     for (int i = 0; i < length; i++) {
         ObjString* key = readString(loader);
         Value val = readValue(loader);
@@ -238,6 +237,20 @@ static ObjNamespace* readNamespace(BytecodeLoader* loader) {
     }
 
     return nspace;
+}
+
+Table readTable(BytecodeLoader* loader) {
+    Table tb;
+    initTable(&tb);
+
+    int length = readInt(loader);
+    for (int i = 0; i < length; i++) {
+        ObjString* key = readString(loader);
+        Value val = readValue(loader);
+        tableSet(loader->vm, &tb, key, val);
+    }
+
+    return tb;
 }
 
 ObjFunction* readBytecode(BytecodeLoader* loader) {

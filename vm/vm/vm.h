@@ -52,6 +52,7 @@ struct VM {
 
     int safeMode;
     int pauseGC;
+    int keepTop;
 
     const char** argv;
     int argc;

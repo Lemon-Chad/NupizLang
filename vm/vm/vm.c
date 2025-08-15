@@ -453,9 +453,10 @@ static void defineDefMethod(VM* vm, int idx) {
             runtimeError(vm, "Unkown default method '%d'.", idx);
             break;
     }
+    push(vm, OBJ_VAL(name));
     declareClassMethod(vm, clazz, name, method, true, false);
     
-    pop(vm);
+    popn(vm, 2);
 }
 
 static void defineBuilder(VM* vm) {
@@ -505,7 +506,11 @@ InterpretResult run(VM* vm) {
             printf("          ");
             for (Value* slot = vm->stack; slot < vm->stackTop; slot++) {
                 printf("[ ");
-                printValue(*slot);
+                if (IS_STRING(*slot)) {
+                    printf("%.*s", AS_STRING(*slot)->length < 10 ? AS_STRING(*slot)->length : 10, AS_CSTRING(*slot));
+                } else {
+                    printValue(*slot);
+                }
                 printf(" ]");
             }
             printf("\n");
@@ -588,7 +593,8 @@ InterpretResult run(VM* vm) {
                 closeUpvalues(vm, frame->slots);
                 vm->frameCount--;
                 if (vm->frameCount == 0) {
-                    pop(vm);
+                    if (vm->keepTop <= 0)
+                        pop(vm);
                     return INTERPRET_OK;
                 }
 
@@ -891,6 +897,9 @@ InterpretResult run(VM* vm) {
                 ObjClass* superclass = AS_CLASS(val);
 
                 tableAddAll(vm, &superclass->methods, &subclass->methods);
+                tableAddAll(vm, &superclass->staticFields, &subclass->staticFields);
+                for (int i = 0; i < DEFAULT_METHOD_COUNT; i++)
+                    subclass->defaultMethods[i] = superclass->defaultMethods[i];
                 tableAddAll(vm, &superclass->fields, &subclass->fields);
                 for (int i = 0; i < DEFAULT_METHOD_COUNT; i++)
                     subclass->defaultMethods[i] = superclass->defaultMethods[i];    
@@ -925,9 +934,10 @@ InterpretResult run(VM* vm) {
             case OP_MAKE_LIST: {
                 int argc = READ_BYTE();
                 ObjList* list = newList(vm);
+                push(vm, OBJ_VAL(list));
                 for (int i = 0; i < argc; i++)
-                    writeValueArray(vm, &list->list, peek(vm, argc - i - 1));
-                popn(vm, argc);
+                    writeValueArray(vm, &list->list, peek(vm, argc - i));
+                popn(vm, argc + 1);
                 push(vm, OBJ_VAL(list));
                 break;
             }

@@ -190,6 +190,8 @@ static void markRoots(VM* vm) {
 
     markTable(vm, &vm->globals);
     markTable(vm, &vm->libraries);
+    markObject(vm, (Obj*) vm->mainFunc);
+    
     markCompilerRoots(vm, vm->compiler);
 }
 
@@ -219,6 +221,9 @@ static void blackenObject(VM* vm, Obj* obj) {
             markObject(vm, (Obj*) clazz->name);
             markObject(vm, (Obj*) clazz->constructor);
             markTable(vm, &clazz->methods);
+            markTable(vm, &clazz->fields);
+            markTable(vm, &clazz->staticFields);
+            markValue(vm, clazz->bound);
             break;
         }
 
@@ -226,6 +231,7 @@ static void blackenObject(VM* vm, Obj* obj) {
             ObjInstance* inst = (ObjInstance*) obj;
             markObject(vm, (Obj*) inst->clazz);
             markTable(vm, &inst->fields);
+            markValue(vm, inst->bound);
             break;
         }
 
@@ -318,7 +324,7 @@ void collectGarbage(VM* vm) {
         return;
     
     #ifdef DEBUG_LOG_GC
-        printf("-- gc begin\n");
+        //printf("-- gc begin\n");
 
         size_t before = vm->bytesAllocated;
     #endif
@@ -331,7 +337,7 @@ void collectGarbage(VM* vm) {
     vm->nextGC = vm->bytesAllocated * GC_HEAP_GROWTH_FACTOR;
 
     #ifdef DEBUG_LOG_GC
-        printf("-- gc end\n");
+        //printf("-- gc end\n");
         printf("   collected %zu bytes (from %zu to %zu) next at %zu\n",
             before - vm->bytesAllocated, before, vm->bytesAllocated, vm->nextGC);
     #endif

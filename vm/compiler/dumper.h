@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "../util/table.h"
 #include "../vm/value.h"
 
 typedef enum {
@@ -37,5 +38,6 @@ DumpedBytes* dumpFunction(VM* vm, ObjFunction* func);
 DumpedBytes* dumpChunk(VM* vm, Chunk* chunk);
 DumpedBytes* dumpValueArray(VM* vm, ValueArray* array);
 DumpedBytes* dumpValue(VM* vm, Value val);
+DumpedBytes* dumpTable(VM* vm, Table* tb);
 
 #endif

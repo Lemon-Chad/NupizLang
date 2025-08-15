@@ -186,3 +186,16 @@ DumpedBytes* dumpValue(VM* vm, Value val) {
 
     return bytes;
 }
+
+DumpedBytes* dumpTable(VM* vm, Table* tb) {
+    DumpedBytes* bytes = newDumpedBytes(vm);
+
+    writeInt(vm, bytes, tb->count);
+    for (int i = 0; i < tb->capacity; i++) {
+        if (tb->entries[i].key == NULL) continue;
+        writeObject(vm, bytes, (Obj*) tb->entries[i].key);
+        takeBytes(vm, bytes, dumpValue(vm, tb->entries[i].value));
+    }
+
+    return bytes;
+}

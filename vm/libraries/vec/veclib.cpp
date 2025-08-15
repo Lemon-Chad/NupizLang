@@ -22,11 +22,16 @@ static NativeResult vecFromNative(VM* vm, int argc, Value* args) {
     if (IS_STRING(args[0])) {
         ObjString* str = AS_STRING(args[0]);
         vec = new std::vector<Value>(str->length);
-        for (int i = 0; i < str->length; i++)
-            (*vec)[i] = OBJ_VAL(formatString(vm, "%c", str->chars[i]));
+        for (int i = 0; i < str->length; i++) {
+            Value c = OBJ_VAL(formatString(vm, "%c", str->chars[i]));
+            push(vm, c);
+            (*vec)[i] = c;
+        }
+        popn(vm, str->length);
     } else if (IS_LIST(args[0])) {
         ValueArray* list = &AS_LIST(args[0])->list;
-        vec = new std::vector<Value>(list->values, list->values + list->count);
+        vec = new std::vector<Value>(list->values, 
+                list->values + list->count);
     } else {
         runtimeError(vm, "Expected list or string as argument.");
         return NATIVE_FAIL;

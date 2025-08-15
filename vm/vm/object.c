@@ -64,6 +64,7 @@ ObjClosure* newClosure(VM* vm, ObjFunction* func) {
 
 ObjFunction* newFunction(VM* vm) {
     ObjFunction* func = ALLOCATE_OBJ(vm, ObjFunction, OBJ_FUNCTION);
+
     func->arity = 0;
     func->name = NULL;
     func->upvalueCount = 0;
@@ -88,6 +89,7 @@ ObjClass* newClass(VM* vm, ObjString* name) {
 
 ObjInstance* newInstance(VM* vm, ObjClass* clazz) {
     ObjInstance* inst = ALLOCATE_OBJ(vm, ObjInstance, OBJ_INSTANCE);
+    push(vm, OBJ_VAL(inst));
     inst->clazz = clazz;
     initTable(&inst->fields);
     for (int i = 0; i < clazz->fields.capacity; i++) {
@@ -95,8 +97,12 @@ ObjInstance* newInstance(VM* vm, ObjClass* clazz) {
         if (entry->key == NULL)
             continue;
         
-        tableSet(vm, &inst->fields, entry->key, OBJ_VAL(copyAttribute(vm, entry->value)));
+        Value attr = OBJ_VAL(copyAttribute(vm, entry->value));
+        push(vm, attr);
+        tableSet(vm, &inst->fields, entry->key, attr);
+        pop(vm);
     }
+    pop(vm);
     inst->bound = clazz->bound;
     return inst;
 }
@@ -348,20 +354,18 @@ ObjAttribute* copyAttribute(VM* vm, Value attr) {
 bool declareClassField(VM* vm, ObjClass* clazz, ObjString* name, Value val, 
         bool isPublic, bool isStatic, bool isConstant) {
     ObjAttribute* attr = newAttribute(vm, val, isPublic, isStatic, isConstant);
+    push(vm, OBJ_VAL(attr));
     Table* tb = isStatic ? &clazz->staticFields : &clazz->fields;
-    if (!tableSet(vm, tb, name, OBJ_VAL(attr))) {
-        runtimeError(vm, "Attribute '%s' is already defined on class '%s'.", name->chars, clazz->name->chars);
-        return false;
-    }
+    tableSet(vm, tb, name, OBJ_VAL(attr));
+    pop(vm);
     return true;
 }
 
 bool declareClassMethod(VM* vm, ObjClass* clazz, ObjString* name, Value val, bool isPublic, bool isStatic) {
     ObjAttribute* attr = newAttribute(vm, val, isPublic, isStatic, true);
-    if (!tableSet(vm, &clazz->methods, name, OBJ_VAL(attr))) {
-        runtimeError(vm, "Method '%s' is already defined on class '%s'.", name->chars, clazz->name->chars);
-        return false;
-    }
+    push(vm, OBJ_VAL(attr));
+    tableSet(vm, &clazz->methods, name, OBJ_VAL(attr));
+    pop(vm);
     return true;
 }
 

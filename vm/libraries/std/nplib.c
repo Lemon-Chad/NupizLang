@@ -126,9 +126,12 @@ static NativeResult cmdargsNative(VM* vm, int argc, Value* args) {
     
     ObjList* lst = newList(vm);
     push(vm, OBJ_VAL(lst));
-    for (int i = 0; i < vm->argc; i++)
-        writeValueArray(vm, &lst->list, 
-            OBJ_VAL(copyString(vm, vm->argv[i], strlen(vm->argv[i]))));
+    for (int i = 0; i < vm->argc; i++) {
+        Value str = OBJ_VAL(copyString(vm, vm->argv[i], strlen(vm->argv[i])));
+        push(vm, str);
+        writeValueArray(vm, &lst->list, str);
+        pop(vm);
+    }
     pop(vm);
     return NATIVE_VAL(OBJ_VAL(lst));
 }
@@ -229,12 +232,19 @@ static NativeResult splitNative(VM* vm, int argc, Value* args) {
     char* idx = string->chars;
     for (char* i = string->chars; i <= string->chars + string->length - delim->length; i++) {
         if (memcmp(i, delim->chars, delim->length) == 0) {
-            writeValueArray(vm, &lst->list, OBJ_VAL(copyString(vm, idx, i - idx)));
+            Value str = OBJ_VAL(copyString(vm, idx, i - idx));
+            push(vm, str);
+            writeValueArray(vm, &lst->list, str);
+            pop(vm);
             i += delim->length - 1;
             idx = i + 1;
         }
     }
-    writeValueArray(vm, &lst->list, OBJ_VAL(copyString(vm, idx, string->chars + string->length - idx)));
+
+    Value str = OBJ_VAL(copyString(vm, idx, string->chars + string->length - idx));
+    push(vm, str);
+    writeValueArray(vm, &lst->list, str);
+    pop(vm);
 
     pop(vm);
     return NATIVE_VAL(OBJ_VAL(lst));

@@ -167,7 +167,7 @@ static ObjString* readString(BytecodeLoader* loader) {
     consume(loader, DUMP_STRING);
 
     int length = readInt(loader);
-    char* src = ALLOCATE(loader->vm, char, length);
+    char* src = ALLOCATE(loader->vm, char, length + 1);
     if (loader->idx + length > loader->length) {
         fprintf(stderr, "Malformed bytecode, expected %d bytes in string, got %d.\n", 
             length, loader->length - loader->idx);
@@ -181,6 +181,7 @@ static ObjString* readString(BytecodeLoader* loader) {
     // 
 
     memcpy(src, loader->bytes + loader->idx, length);
+    src[length] = '\0';
     loader->idx += length - 1;
     advance(loader);
 

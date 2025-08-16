@@ -87,7 +87,6 @@ void freeVM(VM* vm) {
 
 void decoupleVM(VM* vm) {
     vm->mainFunc = NULL;
-    collectGarbage(vm);
 
     endVM(vm);
 }

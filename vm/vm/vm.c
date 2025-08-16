@@ -427,6 +427,22 @@ static void concatenate(VM* vm) {
     push(vm, OBJ_VAL(res));
 }
 
+static void addLists(VM* vm) {
+    ObjList* b = AS_LIST(peek(vm, 0));
+    ObjList* a = AS_LIST(peek(vm, 1));
+
+    ObjList* list = newList(vm);
+    push(vm, OBJ_VAL(list));
+
+    for (int i = 0; i < a->list.count; i++)
+        writeValueArray(vm, &list->list, a->list.values[i]);
+    for (int i = 0; i < b->list.count; i++)
+        writeValueArray(vm, &list->list, b->list.values[i]);
+
+    popn(vm, 3);
+    push(vm, OBJ_VAL(list));
+}
+
 static bool defineMethod(VM* vm, ObjString* name, bool isPublic, bool isStatic) {
     Value method = peek(vm, 0);
     ObjClass* clazz = AS_CLASS(peek(vm, 1));
@@ -576,6 +592,8 @@ InterpretResult run(VM* vm) {
             case OP_ADD:
                 if (IS_STRING(peek(vm, 0)) && IS_STRING(peek(vm, 1))) {
                     concatenate(vm);
+                } else if (IS_LIST(peek(vm, 0)) && IS_LIST(peek(vm, 0))) {
+                    addLists(vm);
                 } else if (IS_NUMBER(peek(vm, 0)) && IS_NUMBER(peek(vm, 1))) {
                     double b = AS_NUMBER(pop(vm));
                     double a = AS_NUMBER(pop(vm));

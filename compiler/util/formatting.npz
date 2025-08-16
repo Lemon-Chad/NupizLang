@@ -56,7 +56,7 @@ func getMargin(text) {
     return margin;
 }
 
-func leftAlign(text) {
+func getMarginLength(text) {
     const lines = std.split(text, "\n");
     const n = std.length(lines);
     let margin = -1;
@@ -68,6 +68,14 @@ func leftAlign(text) {
                 && currentMargin < std.length(line)))
             margin = currentMargin;
     }
+
+    return margin;
+}
+
+func leftAlign(text) {
+    const lines = std.split(text, "\n");
+    const n = std.length(lines);
+    let margin = getMarginLength(text);
 
     let res = "";
     for (let i = 0; i < n; i += 1)
@@ -102,45 +110,49 @@ func underlineCode(src, idx, len) {
     const start = findLineStart(src, idx);
     const end = findLineEnd(src, idx + len);
     const snippet = codeSnippet(src, idx, len);
+    const lineNo = idxToLine(src, idx) + 1;
 
     const lines = std.split(snippet, "\n");
     const n = std.length(lines);
+    const numLength = std.length(std.asString(lineNo + n - 1));
 
     if (n == 1) {
         const line = lines[0];
         const margin = getMargin(line);
         const marginLength = std.length(margin);
-        std.println(end);
 
-        return line + "\n" + margin + 
-            std.repeat(" ", idx - (start + marginLength)) + 
+        return std.asString(lineNo) + ":: " + std.slice(line, marginLength, -1) + "\n"
+            + std.repeat(" ", numLength + 3 + idx - start) + 
             highlightBar(len);
     }
+
+    const marginLength = getMarginLength(snippet);
 
     let res = "";
     let j = start;
     for (let i = 0; i < n; i += 1) {
-        const line = lines[i];
+        const line = std.slice(lines[i], marginLength, -1);
         const lineLength = std.length(line);
-
         const margin = getMargin(line);
-        const marginLength = std.length(margin);
+        const lineMargin = std.length(margin);
 
-        res += line + "\n" + margin;
-        if (j + marginLength < idx) {
-            res += std.repeat(" ", idx - (j + marginLength)) + 
-                highlightBar(j + lineLength - idx);
-        } else if (j + lineLength > idx + len) {
-            res += highlightBar(idx + len - (j + marginLength));
+        res += std.repeat(" ", numLength - std.length(std.asString(lineNo + i))) +
+                std.asString(lineNo + i) + ":: " + line + "\n" + 
+                std.repeat(" ", numLength + 3) + margin;
+        if (j + lineMargin + marginLength < idx) {
+            res += std.repeat(" ", idx - (j + lineMargin + marginLength)) +
+                highlightBar(j + lineLength + marginLength - idx);
+        } else if (j + lineLength + marginLength > idx + len) {
+            res += highlightBar(idx + len - (j + lineMargin + marginLength));
         } else {
-            res += highlightBar(lineLength - marginLength);
+            res += highlightBar(lineLength - lineMargin);
         }
 
         res += "\n";
         j += lineLength + 1;
     }
 
-    return leftAlign(std.slice(res, 0, -2));
+    return std.slice(res, 0, -2);
 }
 
 func getFilename(path) {

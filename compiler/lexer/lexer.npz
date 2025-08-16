@@ -2,6 +2,7 @@ import std;
 import npvec;
 
 unpack import "./token.npz";
+const resPkg = import "../parser/result.npz";
 
 class Lexer {
     let prv src;
@@ -59,8 +60,12 @@ class Lexer {
         errored = false;
     }
 
-    func prv setError(msg) {
-        errorMessage = msg;
+    func prv setError(title, msg) {
+        let span = 1;
+        if (idx >= len) 
+            span = -1;
+
+        errorMessage = resPkg.Error(filename, src, idx, span, title, msg);
         errored = true;
     }
 
@@ -100,7 +105,8 @@ class Lexer {
 
     func prv consume(target) {
         if (current != target) {
-            setError("Expected '" + target + "', found '" + current + "'.");
+            setError("Unexpected Character", 
+                "Expected '" + target + "', found '" + current + "'.");
             return false;
         }
 
@@ -156,7 +162,7 @@ class Lexer {
             advance();
 
             if (idx >= len) {
-                setError("String abruptly terminates.");
+                setError("End of File", "File ends before string terminates");
                 return false;
             }
             
@@ -186,7 +192,7 @@ class Lexer {
         }
 
         if (current != opener) {
-            setError("Expected " + opener + " after string.");
+            setError("End of File", "File ends before string terminates");
             return false;
         }
         advance();
@@ -296,7 +302,7 @@ class Lexer {
             // End of double character tokens.
 
             else {
-                setError("Unknown symbol '" + current + "'.");
+                setError("Unknown Character", "Unknown symbol '" + current + "'.");
                 return false;
             }
 
@@ -328,7 +334,9 @@ class Lexer {
     }
 
     func pub printError() {
-        std.println("Error at line " + std.asString(line) + " col " + std.asString(col) + ": ");
-        std.println("\t-- " + std.asString(errorMessage));
+        std.println(std.asString(errorMessage));
+
+        // std.println("Error at line " + std.asString(line) + " col " + std.asString(col) + ": ");
+        // std.println("\t-- " + std.asString(errorMessage));
     }
 }

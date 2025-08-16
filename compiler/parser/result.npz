@@ -22,17 +22,16 @@ class Error {
 
     func def string() {
         if (idx == -1 || len == -1) {
-            return name + ": " + desc;
+            if (filename == null)
+                return name + ": " + desc;
+            return name + ": " + desc + "\n" + "File " + filename;
         }
 
-        const line = formatPkg.idxToLine(src, idx);
+        const line = formatPkg.idxToLine(src, idx) + 1;
         return name + ": " + desc + "\n" +
             "File " + filename + ", line " + 
             std.asString(line) + "\n" +
-            formatPkg.addMargin(formatPkg.numberSnippetLines(
-                formatPkg.underlineCode(src, idx, len),
-                line
-            ), "  ");
+            formatPkg.addMargin(formatPkg.underlineCode(src, idx, len), "  ");
     }
 
     func static IllegalCharError(filename, src, idx, len, desc) {

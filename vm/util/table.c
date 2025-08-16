@@ -155,7 +155,7 @@ bool tableDelete(Table* tb, ObjString* key) {
 }
 
 void printTable(Table* tb) {
-    printf("{ ");
+    printf("{ \n");
     for (int i = 0; i < tb->capacity; i++) {
         Entry* entry = &tb->entries[i];
         if (entry->key == NULL)
@@ -163,7 +163,7 @@ void printTable(Table* tb) {
         
         printf("(\"%s\"[%d] -> ", entry->key->chars, i);
         printValue(entry->value);
-        printf(") ");
+        printf(") \n");
     }
     printf("}");
 }

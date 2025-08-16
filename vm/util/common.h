@@ -9,13 +9,18 @@
 #ifdef WIN32
 #include <io.h>
 #include <direct.h>
+#include <stdlib.h>
+#include <windows.h>
 #define F_OK 0
 #define access _access
 #define getcwd _getcwd
+#define realpath(a, b) _fullpath(b, a, MAX_PATH)
+#define PATH_MAX MAX_PATH
 #endif
 
 #ifndef WIN32
 #include <unistd.h>
+#include <limits.h>
 #endif
 
 //#define DEBUG_PRINT_DUMPER

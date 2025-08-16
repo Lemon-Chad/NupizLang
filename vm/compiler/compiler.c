@@ -212,6 +212,7 @@ static void initCompiler(Compiler* compiler, Parser* parser, FunctionType type) 
     compiler->breakCount = 0;
 
     compiler->function = newFunction(parser->vm);
+    compiler->function->name = parser->vm->nspace->name;
     compiler->type = type;
 
     parser->vm->compiler = compiler;
@@ -776,7 +777,7 @@ static void classDeclaration(Parser* parser) {
     consume(parser, TOKEN_RIGHT_BRACE, "Expected '}' after class body.");
 
     emitByte(parser, OP_POP);
-    
+
     if (classCompiler.hasSuperclass) {
         endScope(parser);
     }
@@ -986,20 +987,44 @@ static void grouping(Parser* parser, bool canAssign) {
 }
 
 static void importFile(Parser* parser) {
-    ObjString* filename = copyString(parser->vm, parser->previous.start + 1, parser->previous.length - 2);
+    ObjString* relPath = copyString(parser->vm, parser->previous.start + 1, parser->previous.length - 2);
+    push(parser->vm, OBJ_VAL(relPath));
+    
+    char* absPath = getFullPath(relPath->chars);
+    if (absPath == NULL) {
+        error(parser, "Failed to import file.");
+        return;
+    }
+    ObjString* filename = takeString(parser->vm, absPath, strlen(absPath));
     emitConstant(parser, OBJ_VAL(filename));
+
+    pop(parser->vm);
 
     char* src = readFile(filename->chars);
 
     char* cwd = getCurrentWorkingDirectory();
     changeDirectoryToFile(filename->chars);
 
+    Value importVal;
+    if (tableGet(&parser->vm->importedFiles, filename, &importVal) 
+            && IS_FUNCTION(importVal)) {
+        emitConstant(parser, OBJ_VAL(filename));
+        emitByte(parser, OP_IMPORT_FILE);
+        changeDirectory(cwd);
+        free(cwd);
+        return;
+    }
+
     VM temp;
 
-    initVM(&temp);
-    ObjFunction* func = compile(&temp, src);
+    initVM(&temp, filename->chars);
+    tableAddAll(&temp, &parser->vm->importedFiles, &temp.importedFiles);
+    ObjFunction* func = compile(&temp, filename->chars, src);
     push(parser->vm, OBJ_VAL(func));
+    tableAddAll(parser->vm, &temp.importedFiles, &parser->vm->importedFiles);
+    
     decoupleVM(&temp);
+    takeOwnership(parser->vm, temp.objects);
 
     changeDirectory(cwd);
     free(cwd);
@@ -1292,7 +1317,7 @@ static void parsePrecedence(Parser* parser, Precedence prec) {
     }
 }
 
-ObjFunction* compile(VM* vm, const char* src) {
+ObjFunction* compile(VM* vm, const char* filepath, const char* src) {
     Scanner scanner;
     initScanner(&scanner, src);
 
@@ -1307,6 +1332,17 @@ ObjFunction* compile(VM* vm, const char* src) {
     Compiler compiler;
     initCompiler(&compiler, &parser, FUNC_SCRIPT);
 
+    ObjString* str = copyString(vm, filepath, strlen(filepath));
+    Value importVal;
+    if (tableGet(&vm->importedFiles, str, &importVal) && 
+            IS_FUNCTION(importVal)) {
+        return AS_FUNCTION(importVal);
+    }
+
+    push(vm, OBJ_VAL(str));
+    tableSet(vm, &vm->importedFiles, str, OBJ_VAL(compiler.function));
+    pop(vm);
+
     advance(&parser);
 
     while (!match(&parser, TOKEN_EOF)) {
@@ -1316,6 +1352,7 @@ ObjFunction* compile(VM* vm, const char* src) {
     consume(&parser, TOKEN_EOF, "Expect end of expression.");
 
     ObjFunction* func = endCompiler(&parser);
+    func->name = str;
 
     return parser.hadError ? NULL : func;
 }

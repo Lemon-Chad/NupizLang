@@ -22,6 +22,7 @@
 #define FREE(vm, type, ptr) reallocate(vm, ptr, sizeof(type), 0)
 
 void* reallocate(VM* vm, void* ptr, size_t oldSize, size_t newSize);
+void freeObject(VM* vm, Obj* obj);
 void freeObjects(VM* vm);
 void markObject(VM* vm, Obj* obj);
 void markValue(VM* vm, Value val);
@@ -34,5 +35,6 @@ char* getDirectory(char* path);
 void changeDirectory(char* path);
 void changeDirectoryToFile(char* path);
 char* getCurrentWorkingDirectory();
+char* getFullPath(char* path);
 
 #endif

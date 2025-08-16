@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include "../vm/object.h"
 #include "memory.h"
@@ -32,8 +33,8 @@ void* reallocate(VM* vm, void* ptr, size_t oldSize, size_t newSize) {
 
 
 
-static void freeObject(VM* vm, Obj* obj) {
-    #ifdef DEBUG_SLOG_GC
+void freeObject(VM* vm, Obj* obj) {
+    #ifdef DEBUG_LOG_GC
         printObject(OBJ_VAL(obj));
         printf(": %p free type %d\n", (void*) obj, obj->type);
     #endif
@@ -95,8 +96,8 @@ static void freeObject(VM* vm, Obj* obj) {
 
         case OBJ_NAMESPACE: {
             ObjNamespace* nspace = (ObjNamespace*) obj;
-            freeTable(vm, &nspace->values);
-            freeTable(vm, &nspace->publics);
+            freeTable(vm, nspace->values);
+            freeTable(vm, nspace->publics);
             FREE(vm, ObjNamespace, obj);
             break;
         }
@@ -161,6 +162,9 @@ void markValue(VM* vm, Value val) {
 }
 
 void markTable(VM* vm, Table* tb) {
+    if (tb == NULL)
+        return;
+    
     for (int i = 0; i < tb->capacity; i++) {
         Entry* entry = &tb->entries[i];
         markObject(vm, (Obj*) entry->key);
@@ -191,6 +195,9 @@ static void markRoots(VM* vm) {
     markTable(vm, &vm->globals);
     markTable(vm, &vm->libraries);
     markObject(vm, (Obj*) vm->mainFunc);
+
+    markTable(vm, &vm->importedFiles);
+    markObject(vm, (Obj*) vm->nspace);
     
     markCompilerRoots(vm, vm->compiler);
 }
@@ -258,8 +265,8 @@ static void blackenObject(VM* vm, Obj* obj) {
         case OBJ_NAMESPACE: {
             ObjNamespace* nspace = (ObjNamespace*) obj;
             markObject(vm, (Obj*) nspace->name);
-            markTable(vm, &nspace->values);
-            markTable(vm, &nspace->publics);
+            markTable(vm, nspace->values);
+            markTable(vm, nspace->publics);
             break;
         }
 
@@ -338,6 +345,7 @@ void collectGarbage(VM* vm) {
 
     #ifdef DEBUG_LOG_GC
         //printf("-- gc end\n");
+        if (before != vm->bytesAllocated)
         printf("   collected %zu bytes (from %zu to %zu) next at %zu\n",
             before - vm->bytesAllocated, before, vm->bytesAllocated, vm->nextGC);
     #endif
@@ -402,4 +410,13 @@ char* getCurrentWorkingDirectory() {
         exit(1);
     }
     return buffer;
+}
+
+char* getFullPath(char* path) {
+    char* full = malloc(PATH_MAX);
+    if (realpath(path, full) != NULL)
+        return full;
+    printf("%s: %s/%s\n", strerror(errno), getCurrentWorkingDirectory(), path);
+    free(full);
+    return NULL;
 }

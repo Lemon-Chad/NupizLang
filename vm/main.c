@@ -94,6 +94,8 @@ static ObjFunction* loadFile(VM* vm, char* path) {
     BytecodeLoader* loader = newLoader(vm, src, length);
 
     ObjFunction* func = readBytecode(loader);
+    tableSet(vm, &vm->importedFiles, func->name, OBJ_VAL(vm->nspace));
+
     freeLoader(vm, loader);
     vm->pauseGC--;
 
@@ -102,7 +104,9 @@ static ObjFunction* loadFile(VM* vm, char* path) {
 
 static void compileFile(VM* vm, char* srcPath, char* destPath) {
     char* src = readFile(srcPath);
-    ObjFunction* func = compile(vm, src);
+    char* path = getFullPath(srcPath);
+
+    ObjFunction* func = compile(vm, path, src);
 
     if (func == NULL)
         exit(65);
@@ -150,7 +154,7 @@ static void runFile(VM* vm, char* path) {
 
 int main(int argc, const char* argv[]) {
     VM vm;
-    initVM(&vm);
+    initVM(&vm, "main");
     vm.isMain = true;
 
     int flags = 0;

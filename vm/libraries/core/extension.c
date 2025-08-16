@@ -82,6 +82,7 @@ bool importLibrary(VM* vm, ObjString* lib) {
         return false;
     
     tableSet(vm, &vm->globals, library->name, OBJ_VAL(library->nspace));
+    writeNamespace(vm, vm->nspace, library->name, OBJ_VAL(library->nspace), true);
     
     return true;
 }

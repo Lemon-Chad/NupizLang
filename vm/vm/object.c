@@ -11,6 +11,19 @@
 
 #define ALLOCATE_OBJ(vm, type, objectType) (type*) allocateObject(vm, sizeof(type), objectType)
 
+void takeOwnership(VM* vm, Obj* objs) {
+    vm->bytesAllocated += sizeof(objs);
+
+    Obj* tail = objs;
+    while (tail->next != NULL) {
+        tail = tail->next;
+        vm->bytesAllocated += sizeof(tail);
+    }
+
+    tail->next = vm->objects;
+    vm->objects = objs;
+}
+
 static Obj* allocateObject(VM* vm, size_t size, ObjType type) {
     Obj* object = (Obj*) reallocate(vm, NULL, 0, size);
     object->type = type;
@@ -19,7 +32,7 @@ static Obj* allocateObject(VM* vm, size_t size, ObjType type) {
     object->next = vm->objects;
     vm->objects = object;
 
-    #ifdef DEBUG_LOG_GC
+    #ifdef DEBUG_SLOG_GC
         printf("%p allocate %zu for %d\n", (void*) object, size, type);
     #endif
 
@@ -122,25 +135,34 @@ ObjList* newList(VM* vm) {
 
 ObjNamespace* newNamespace(VM* vm, ObjString* name) {
     ObjNamespace* nspace = ALLOCATE_OBJ(vm, ObjNamespace, OBJ_NAMESPACE);
+    push(vm, OBJ_VAL(nspace));
     
     nspace->name = name;
-    initTable(&nspace->publics);
-    initTable(&nspace->values);
+    nspace->values = NULL;
+    nspace->publics = NULL;
+    
+    nspace->values = ALLOCATE(vm, Table, 1);
+    nspace->publics = ALLOCATE(vm, Table, 1);
+
+    initTable(nspace->publics);
+    initTable(nspace->values);
+
+    pop(vm);
 
     return nspace;
 }
 
 bool writeNamespace(VM* vm, ObjNamespace* nspace, ObjString* name, Value val, bool isPublic) {
-    bool newKey = tableSet(vm, &nspace->values, name, val);
-    if (isPublic)
-        tableSet(vm, &nspace->publics, name, val);
+    bool newKey = tableSet(vm, nspace->values, name, val);
+    if (isPublic && nspace->values != nspace->publics)
+        tableSet(vm, nspace->publics, name, val);
     return newKey;
 }
 
 bool getNamespace(VM* vm, ObjNamespace* nspace, ObjString* name, Value* ptr, bool internal) {
-    if (!internal && !tableGet(&nspace->publics, name, ptr))
+    if (!internal && !tableGet(nspace->publics, name, ptr))
         return false;
-    return tableGet(&nspace->values, name, ptr);
+    return tableGet(nspace->values, name, ptr);
 }
 
 ObjString* takeString(VM* vm, const char* src, int len) {

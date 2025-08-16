@@ -40,7 +40,7 @@ void runtimeError(VM* vm, const char* format, ...) {
     resetStack(vm);
 }
 
-void initVM(VM* vm) {
+void initVM(VM* vm, const char* name) {
     resetStack(vm);
     vm->objects = NULL;
     vm->compiler = NULL;
@@ -48,10 +48,12 @@ void initVM(VM* vm) {
     vm->pauseGC = 0;
     vm->isMain = false;
     vm->mainFunc = NULL;
+    vm->nspace = NULL;
 
     initTable(&vm->globals);
     initTable(&vm->strings);
     initTable(&vm->libraries);
+    initTable(&vm->importedFiles);
 
     vm->grayStack = NULL;
     vm->grayCount = 0;
@@ -64,18 +66,30 @@ void initVM(VM* vm) {
 
     vm->argv = NULL;
     vm->argc = 0;
+
+    ObjString* str = copyString(vm, name, strlen(name));
+    push(vm, OBJ_VAL(str));
+    vm->nspace = newNamespace(vm, str);
+    pop(vm);
+}
+
+static void endVM(VM* vm) {
+    freeTable(vm, &vm->strings);   
+    freeTable(vm, &vm->globals);
+    freeTable(vm, &vm->importedFiles);
 }
 
 void freeVM(VM* vm) {
     freeObjects(vm);
 
-    freeTable(vm, &vm->globals);
-    freeTable(vm, &vm->strings);
+    endVM(vm);
 }
 
 void decoupleVM(VM* vm) {
-    freeTable(vm, &vm->globals);
-    freeTable(vm, &vm->strings);   
+    vm->mainFunc = NULL;
+    collectGarbage(vm);
+
+    endVM(vm);
 }
 
 static bool getBound(VM* vm, Value bound, ObjString* name) {
@@ -304,7 +318,7 @@ static bool invoke(VM* vm, ObjString* name, int argc) {
 
         case OBJ_NAMESPACE: {
             ObjNamespace* nspace = AS_NAMESPACE(reciever);
-            
+
             Value value;
             if (!getNamespace(vm, nspace, name, &value, false)) {
                 runtimeError(vm, "Undefined attribute '%s'.", name->chars);
@@ -612,6 +626,7 @@ InterpretResult run(VM* vm) {
             case OP_DEFINE_GLOBAL: {
                 ObjString* name = READ_STRING();
                 tableSet(vm, &vm->globals, name, peek(vm, 0));
+                writeNamespace(vm, vm->nspace, name, peek(vm, 0), true);
                 pop(vm);
                 break;
             }
@@ -631,6 +646,7 @@ InterpretResult run(VM* vm) {
                     runtimeError(vm, "Global variable '%s' is undefined.", name->chars);
                     return INTERPRET_RUNTIME_ERR;
                 }
+                writeNamespace(vm, vm->nspace, name, peek(vm, 0), true);
                 break;
             }
 
@@ -1013,27 +1029,37 @@ InterpretResult run(VM* vm) {
             }
 
             case OP_IMPORT_FILE: {
-                ObjFunction* func = AS_FUNCTION(peek(vm, 0));
                 ObjString* filename = AS_STRING(peek(vm, 1));
 
+                Value importVal;
+                if (IS_STRING(peek(vm, 0)) && 
+                        tableGet(&vm->importedFiles, filename, &importVal) && 
+                        IS_NAMESPACE(importVal)) {
+                    vm->stackTop[-2] = importVal;
+                    pop(vm);
+                    break;
+                }
+
+                ObjFunction* func = AS_FUNCTION(peek(vm, 0));
+
                 VM temp;
-                initVM(&temp);
+                initVM(&temp, filename->chars);
+
+                tableSet(vm, &vm->importedFiles, filename, OBJ_VAL(temp.nspace));
+                tableAddAll(&temp, &vm->importedFiles, &temp.importedFiles);
 
                 runFunc(&temp, func);
 
-                ObjNamespace* nspace = newNamespace(vm, filename);
+                ObjNamespace* nspace = temp.nspace;
                 vm->stackTop[-2] = OBJ_VAL(nspace);
-
-                for (int i = 0; i < temp.globals.capacity; i++) {
-                    Entry* entry = &temp.globals.entries[i];
-                    if (entry->key == NULL)
-                        continue;
-                    writeNamespace(vm, nspace, entry->key, entry->value, true);
-                }
-
+                tableSet(vm, &vm->importedFiles, filename, OBJ_VAL(nspace));
+                tableAddAll(vm, &temp.importedFiles, &vm->importedFiles);
+                
                 decoupleVM(&temp);
+                takeOwnership(vm, temp.objects);
                 
                 pop(vm);
+
                 break;
             }
 
@@ -1046,7 +1072,9 @@ InterpretResult run(VM* vm) {
 
                 switch (OBJ_TYPE(op)) {
                     case OBJ_NAMESPACE: {
-                        tableAddAll(vm, &AS_NAMESPACE(op)->publics, &vm->globals);
+                        tableAddAll(vm, AS_NAMESPACE(op)->publics, &vm->globals);
+                        tableAddAll(vm, AS_NAMESPACE(op)->publics, vm->nspace->publics);
+                        tableAddAll(vm, AS_NAMESPACE(op)->publics, vm->nspace->values);
                         break;
                     }
 
@@ -1079,14 +1107,6 @@ InterpretResult runFuncBound(VM* vm, ObjFunction* func, Value bound) {
 
 InterpretResult runFunc(VM* vm, ObjFunction* func) {
     return runFuncBound(vm, func, NULL_VAL);
-}
-
-InterpretResult interpret(VM* vm, const char* src) {
-    ObjFunction* func = compile(vm, src);
-    if (func == NULL)
-        return INTERPRET_COMPILE_ERR;
-    
-    return runFunc(vm, func);
 }
 
 void push(VM* vm, Value value) {

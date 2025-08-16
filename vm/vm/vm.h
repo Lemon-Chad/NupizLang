@@ -58,6 +58,9 @@ struct VM {
     int argc;
     bool isMain;
     ObjFunction* mainFunc;
+
+    ObjNamespace* nspace;
+    Table importedFiles;
 };
 
 typedef enum {
@@ -66,13 +69,12 @@ typedef enum {
     INTERPRET_RUNTIME_ERR,
 } InterpretResult;
 
-void initVM(VM* vm);
+void initVM(VM* vm, const char* name);
 void freeVM(VM* vm);
 void decoupleVM(VM* vm);
 
 InterpretResult runFuncBound(VM* vm, ObjFunction* func, Value binder);
 InterpretResult runFunc(VM* vm, ObjFunction* func);
-InterpretResult interpret(VM* vm, const char* src);
 void push(VM* vm, Value value);
 Value pop(VM* vm);
 void popn(VM* vm, int n);

@@ -40,6 +40,9 @@ static void writeObject(VM* vm, DumpedBytes* bytes, Obj* obj) {
     switch (obj->type) {
         case OBJ_STRING: {
             ObjString* str = (ObjString*) obj;
+            #ifdef DEBUG_PRINT_DUMPER
+                printf("-- writing string '%s'\n", str->chars);
+            #endif
             writeByte(vm, bytes, DUMP_STRING);
             writeInt(vm, bytes, str->length);
             for (int i = 0; i < str->length; i++)
@@ -59,16 +62,16 @@ static void writeObject(VM* vm, DumpedBytes* bytes, Obj* obj) {
             ObjNamespace* nspace = (ObjNamespace*) obj;
             writeByte(vm, bytes, DUMP_NAMESPACE);
             writeObject(vm, bytes, (Obj*) nspace->name);
-            writeInt(vm, bytes, nspace->values.count);
-            for (int i = 0; i < nspace->values.capacity; i++) {
-                Entry* entry = &nspace->values.entries[i];
+            writeInt(vm, bytes, nspace->values->count);
+            for (int i = 0; i < nspace->values->capacity; i++) {
+                Entry* entry = &nspace->values->entries[i];
                 if (entry->key == NULL)
                     continue;
                 
                 writeObject(vm, bytes, (Obj*) entry->key);
                 takeBytes(vm, bytes, dumpValue(vm, entry->value));
                 writeByte(vm, bytes, 
-                    tableGet(&nspace->publics, entry->key, NULL) ? 1 : 0);
+                    tableGet(nspace->publics, entry->key, NULL) ? 1 : 0);
             }
             break;
         }
@@ -110,6 +113,10 @@ bool dumpBytes(FILE* fp, DumpedBytes* bytes) {
 DumpedBytes* dumpFunction(VM* vm, ObjFunction* func) {
     DumpedBytes* bytes = newDumpedBytes(vm);
 
+    #ifdef DEBUG_PRINT_DUMPER
+        printf("    -- writing function '%s'\n", func->name->chars);
+    #endif
+
     writeByte(vm, bytes, DUMP_FUNC);
     writeByte(vm, bytes, func->arity);
     if (func->name == NULL)
@@ -121,11 +128,19 @@ DumpedBytes* dumpFunction(VM* vm, ObjFunction* func) {
     
     takeBytes(vm, bytes, dumpChunk(vm, &func->chunk));
 
+    #ifdef DEBUG_PRINT_DUMPER
+        printf("    -- wrote function '%s'\n", func->name->chars);
+    #endif
+
     return bytes;
 }
 
 DumpedBytes* dumpChunk(VM* vm, Chunk* chunk) {
     DumpedBytes* bytes = newDumpedBytes(vm);
+
+    #ifdef DEBUG_PRINT_DUMPER
+        printf("-- writing chunk\n");
+    #endif
 
     writeByte(vm, bytes, DUMP_CHUNK);
 
@@ -138,8 +153,9 @@ DumpedBytes* dumpChunk(VM* vm, Chunk* chunk) {
     takeBytes(vm, bytes, dumpValueArray(vm, &chunk->constants));
 
     writeInt(vm, bytes, chunk->count);
-    for (int i = 0; i < chunk->count; i++)
+    for (int i = 0; i < chunk->count; i++) {
         writeByte(vm, bytes, chunk->code[i]);
+    }
     
     return bytes;
 }
@@ -159,11 +175,17 @@ DumpedBytes* dumpValue(VM* vm, Value val) {
 
     switch (val.type) {
         case VAL_BOOL:
+            #ifdef DEBUG_PRINT_DUMPER
+                printf("-- writing bool '%s'\n", AS_BOOL(val) ? "true" : "false");
+            #endif
             writeByte(vm, bytes, DUMP_BOOL);
             writeByte(vm, bytes, AS_BOOL(val) ? 1 : 0);
             break;
         
         case VAL_NUMBER: {
+            #ifdef DEBUG_PRINT_DUMPER
+                printf("-- writing number '%f'\n", AS_NUMBER(val));
+            #endif
             writeByte(vm, bytes, DUMP_NUMBER);
 
             uint8_t byte_array[sizeof(double)];
@@ -176,6 +198,9 @@ DumpedBytes* dumpValue(VM* vm, Value val) {
         }
 
         case VAL_NULL:
+            #ifdef DEBUG_PRINT_DUMPER
+                printf("-- writing null\n");
+            #endif
             writeByte(vm, bytes, DUMP_NULL);
             break;
         

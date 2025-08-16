@@ -141,8 +141,8 @@ struct ObjList {
 struct ObjNamespace {
     Obj obj;
     ObjString* name;
-    Table publics;
-    Table values;
+    Table* publics;
+    Table* values;
 };
 
 struct ObjLibrary {
@@ -212,5 +212,7 @@ ObjString* formatString(VM* vm, const char* format, ...);
 ObjUpvalue* newUpvalue(VM* vm, Value* slot);
 ObjString* strObject(VM* vm, Value val);
 void printObject(Value val);
+
+void takeOwnership(VM* vm, Obj* objs);
 
 #endif

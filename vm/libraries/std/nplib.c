@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -287,6 +288,26 @@ static NativeResult repeatNative(VM* vm, int argc, Value* args) {
     return NATIVE_VAL(OBJ_VAL(takeString(vm, repeated, string->length * count)));
 }
 
+static NativeResult parseNumberNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 1))
+        return NATIVE_FAIL;
+    if (!IS_STRING(args[0])) {
+        runtimeError(vm, "Expected string as first argument.");
+        return NATIVE_FAIL;
+    }
+
+    ObjString* str = AS_STRING(args[0]);
+
+    char* end;
+    double d = strtod(str->chars, &end);
+    if (end != str->chars + str->length) {
+        runtimeError(vm, "String does not contain a valid number.");
+        return NATIVE_FAIL;
+    }
+
+    return NATIVE_VAL(NUMBER_VAL(d));
+}
+
 bool importNPLib(VM* vm, ObjString* lib) {
     LIBFUNC("print", printNative);
     LIBFUNC("println", printlnNative);
@@ -303,6 +324,7 @@ bool importNPLib(VM* vm, ObjString* lib) {
     LIBFUNC("find", findNative);
     LIBFUNC("split", splitNative);
     LIBFUNC("repeat", repeatNative);
+    LIBFUNC("strtod", parseNumberNative);
 
     return true;
 }

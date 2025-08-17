@@ -20,6 +20,7 @@ Standard library for Nupiz.
 - [find](#find)
 - [split](#split)
 - [repeat](#repeat)
+- [strtod](#strtod)
 
 ## print
 
@@ -110,3 +111,10 @@ Splits a string into a list of substrings each time the delimiter is encountered
 `std.repeat(string, count)`
 
 Returns a new string with the given string concatenated in a row as many times as given. Count must be non-negative.
+
+## strtod
+
+`std.strtod(string)`
+
+Parses a string to be a number and returns the number. If the format is invalid, errors.
+

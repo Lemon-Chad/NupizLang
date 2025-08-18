@@ -1,23 +1,106 @@
 import std;
 import npvec;
+import npmap;
 
+unpack import "./result.npz";
+unpack import "../lexer/token.npz";
 unpack import "./conventions.npz";
 
+unpack import "../nodes/func_nodes.npz";
+unpack import "../nodes/op_nodes.npz";
+unpack import "../nodes/value_nodes.npz";
+unpack import "../nodes/var_nodes.npz";
+unpack import "../nodes/control_nodes.npz";
+
+unpack import "../compiler/op_codes.npz";
+
+class Precedence {
+    const pub static NONE           =  0;
+    const pub static ASSIGNMENT     =  1;
+    const pub static OR             =  2;
+    const pub static AND            =  3;
+    const pub static EQUALITY       =  4;
+    const pub static COMPARISON     =  5;
+    const pub static TERM           =  6;
+    const pub static FACTOR         =  7;
+    const pub static UNARY          =  8;
+    const pub static CALL           =  9;
+    const pub static PRIMARY        = 10;
+}
+
 class Parser {
+    const prv debug = false;
+
+    let prv previous;
     let prv current;
     let prv tokens;
     let prv idx;
     let prv len;
+    let prv rules;
+
+    let prv scopeDepth;
+    let prv ctxStack;
 
     build(toks) {
         tokens = toks;
-
+        let burger = 4;
+    
         idx = 0;
         len = npvec.size(tokens);
         current = npvec.at(toks, 0);
+        previous = null;
+
+        rules = npmap.map(
+            TokenType.LPAREN,           [grouping,  call,   Precedence.CALL],
+            TokenType.DOT,              [null,      dot,    Precedence.CALL],
+            TokenType.MINUS,            [unary,     binary, Precedence.TERM],
+            TokenType.PLUS,             [null,      binary, Precedence.TERM],
+            TokenType.SLASH,            [null,      binary, Precedence.FACTOR],
+            TokenType.STAR,             [null,      binary, Precedence.FACTOR],
+            TokenType.BANG,             [unary,     null,   Precedence.NONE],
+            TokenType.BANG_EQUAL,       [null,      binary, Precedence.EQUALITY],
+            TokenType.EQUAL_EQUAL,      [null,      binary, Precedence.EQUALITY],
+            TokenType.GREATER,          [null,      binary, Precedence.COMPARISON],
+            TokenType.GREATER_EQUAL,    [null,      binary, Precedence.COMPARISON],
+            TokenType.LESS,             [null,      binary, Precedence.COMPARISON],
+            TokenType.LESS_EQUAL,       [null,      binary, Precedence.COMPARISON],
+            TokenType.IDENTIFIER,       [variable,  null,   Precedence.NONE],
+            TokenType.STRING,           [string,    null,   Precedence.NONE],
+            TokenType.NUMBER,           [number,    null,   Precedence.NONE],
+            TokenType.AND,              [null,      and,    Precedence.AND],
+            TokenType.KEYWORD,          [keyword,   null,   Precedence.NONE],
+            TokenType.OR,               [null,      or,     Precedence.OR],
+            TokenType.LBRACKET,         [list,      index,  Precedence.CALL]
+        );
+
+        scopeDepth = 0;
+        ctxStack = npvec.vec();
+    }
+
+    func prv beginScope() {
+        scopeDepth += 1;
+        npvec.append(ctxStack, npmap.map());
+    }
+
+    func prv endScope() {
+        scopeDepth -= 1;
+        npvec.pop(ctxStack);
+    }
+
+    func prv resolveLocal(name) {
+        const height = npvec.size(ctxStack);
+        for (let i = height - 1; i >= 0; i -= 1)
+            if (npmap.has(npvec.at(ctxStack, i), name))
+                return true;
+        return false;
+    }
+
+    func prv declareLocal(name) {
+        npmap.emplace(npvec.at(ctxStack, -1), name, null);
     }
 
     func prv updateTok() {
+        previous = current;
         if (0 <= idx && idx < len)
             current = npvec.at(tokens, idx);
     }
@@ -25,6 +108,11 @@ class Parser {
     func prv advance() {
         idx += 1;
         updateTok();
+
+        if (debug)
+            std.println(
+                "token[" + std.asString(idx) + "] = " + std.asString(current)
+            );
     }
 
     func prv peek(dist) {
@@ -38,6 +126,692 @@ class Parser {
         updateTok();
     }
 
+    func prv match(type, text) {
+        if (current.tokenType == type && (text == null || current.text == text)) {
+            advance();
+            return true;
+        }
+
+        return false;
+    }
+
+    func pub parse() {
+        const res = ParseResult();
+        const nodes = npvec.vec();
+
+        const start = current;
+
+        while (idx < len && current.tokenType != TokenType.EOF) {
+            const node = res.register(declaration());
+            if (res.hasError())
+                return res;
+            npvec.append(nodes, node);
+        }
+
+        if (current.tokenType != TokenType.EOF) {
+            return res.failure(Error.ExpectedCharError(
+                tokens[-1].filename, tokens[-1].src,
+                tokens[-1].idx, tokens[-1].len,
+                "Expected end of file."
+            ));
+        }
+
+        return res.success(
+            BodyNode(nodes).tokSource(start, current)
+        );
+    }
+
+    func prv declaration() {
+        const res = ParseResult();
+        if (match(TokenType.KEYWORD, "var") || 
+                match(TokenType.KEYWORD, "let") || 
+                match(TokenType.KEYWORD, "const")) {
+            res.advance();
+            const isConstant = previous.text == "const";
+            const node = res.register(varDeclaration(isConstant));
+            if (res.hasError())
+                return res;
+            return res.success(node);
+        } else if (match(TokenType.KEYWORD, "func")) {
+            res.advance();
+            const node = res.register(funDeclaration());
+            if (res.hasError())
+                return res;
+            return res.success(node);
+        } else if (match(TokenType.KEYWORD, "class")) {
+            res.advance();
+            // TODO: Class declaration
+        } else {
+            return statement();
+        }
+
+        return res.failure(Error.InvalidSyntax(
+            current.filename, current.src,
+            current.idx, current.len,
+            "Expected declaration or statement."
+        ));
+    }
+
+    func prv declareVariable(name, val, isConstant) {
+        if (scopeDepth > 0) {
+            declareLocal(name);
+            return DeclareLocalNode(name, val, isConstant);
+        }
+
+        return DeclareGlobalNode(name, val, isConstant);
+    }
+
+    func prv getIdentifier() {
+        const res = ParseResult();
+        if (!match(TokenType.IDENTIFIER, null))
+            return res.failure(Error.InvalidSyntax(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected identifier."
+            ));
+        res.advance();
+        const name = previous.text;
+        return res.success(name);
+    }
+
+    func prv varDeclaration(isConstant) {
+        const res = ParseResult();
+
+        const start = previous;
+
+        const name = res.register(getIdentifier());
+        if (res.hasError())
+            return res;
+
+        let val = NullNode();
+        if (match(TokenType.EQUAL, null)) {
+            res.advance();
+            val = res.register(expression());
+            if (res.hasError())
+                return res;
+        }
+
+        if (!match(TokenType.SEMICOLON, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected ';' after declaration."
+            ));
+        res.advance();
+
+        return res.success(
+            declareVariable(name, val, isConstant)
+                .tokSource(start, previous)
+        );
+    }
+
+    func prv block() {
+        const res = ParseResult();
+        const start = previous;
+        const nodes = npvec.vec();
+
+        while (current.tokenType != TokenType.EOF && 
+                current.tokenType != TokenType.RBRACE) {
+            const node = res.register(declaration());
+            if (res.hasError())
+                return res;
+            npvec.append(nodes, node);
+        }
+
+        if (!match(TokenType.RBRACE, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected '}' after block."
+            ));
+        res.advance();
+
+        return res.success(
+            BodyNode(nodes)
+                .tokSource(start, previous)
+        );        
+    }
+
+    func prv function(funcType) {
+        const res = ParseResult();
+
+        beginScope();
+
+        const args = npvec.vec();
+        if (!match(TokenType.LPAREN, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected '(' before function arguments."
+            ));
+        res.advance();
+
+        while (current.tokenType != TokenType.RPAREN) {
+            const isConstant = match(TokenType.KEYWORD, "const");
+            if (isConstant)
+                res.advance();
+            
+            const argName = res.register(getIdentifier());
+            if (res.hasError())
+                return res;
+
+            npvec.append(args, argName);
+
+            if (!match(TokenType.COMMA, null))
+                break;
+            res.advance();
+        }
+
+        if (!match(TokenType.RPAREN, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected ')' after function arguments."
+            ));
+        res.advance();
+
+        if (!match(TokenType.LBRACE, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected '{' before function body."
+            ));
+        res.advance();
+
+        const body = res.register(block());
+        if (res.hasError())
+            return res;
+
+        endScope();
+        
+        return res.success(FuncNode(args, body));
+    }
+
+    func prv funDeclaration() {
+        const res = ParseResult();
+        const start = previous;
+
+        const name = res.register(getIdentifier());
+        if (res.hasError())
+            return res;
+        
+        const fn = res.register(function(FuncType.FUNCTION));
+        if (res.hasError())
+            return res;
+        fn.tokSource(start, previous);
+        
+        return res.success(
+            declareVariable(name, fn, true)
+                .tokSource(start, previous)
+        );
+    }
+
+    func prv returnStatement() {
+        const res = ParseResult();
+        const start = previous;
+
+        if (scopeDepth == 0)
+            return res.failure(Error.InvalidSyntax(
+                current.filename, current.src, 
+                current.idx, current.len,
+                "Cannot return from outside of a function."
+            ));
+        
+        if (match(TokenType.SEMICOLON, null)) {
+            res.advance();
+            return res.success(
+                ReturnNode(NullNode())
+                    .tokSource(start, previous)
+            );
+        }
+
+        const val = res.register(expression());
+        if (!match(TokenType.SEMICOLON, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected ';' after return statement."
+            ));
+        
+        res.advance();
+        return res.success(
+            ReturnNode(val)
+                .tokSource(start, previous)
+        );
+    }
+
+    func prv ifStatement() {
+        const res = ParseResult();
+        const start = previous;
+        if (!match(TokenType.LPAREN, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected '(' before condition."
+            ));
+        
+        res.advance();
+        const condition = res.register(expression());
+        if (res.hasError())
+            return res;
+        
+        if (!match(TokenType.RPAREN, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected '(' after condition."
+            ));
+        
+        res.advance();
+        const ifTrue = res.register(statement());
+        if (res.hasError())
+            return false;
+        
+        let ifFalse = null;
+        if (match(TokenType.KEYWORD, "else")) {
+            res.advance();
+            ifFalse = res.register(statement());
+            if (res.hasError())
+                return res;
+        }
+
+        return res.success(
+            IfNode(condition, ifTrue, ifFalse)
+                .tokSource(start, previous)
+        );
+    }
+
+    func prv statement() {
+        const res = ParseResult();
+        if (match(TokenType.KEYWORD, "return")) {
+            res.advance();
+            const node = res.register(returnStatement());
+            if (res.hasError())
+                return res;
+            return res.success(node);
+        } else if (match(TokenType.KEYWORD, "if")) {
+            res.advance();
+            const node = res.register(ifStatement());
+            if (res.hasError())
+                return res;
+            return res.success(node);
+        } else if (match(TokenType.KEYWORD, "while")) {
+            res.advance();
+            // TODO: Implement while loops
+        } else if (match(TokenType.KEYWORD, "for")) {
+            res.advance();
+            // TODO: Implement for loops
+        } else if (match(TokenType.KEYWORD, "break") ||
+                match(TokenType.KEYWORD, "continue")) {
+            res.advance();
+
+            const start = previous;
+            const text = previous.text;
+            if (!match(TokenType.SEMICOLON, null))
+                return res.failure(Error.ExpectedCharError(
+                    current.filename, current.src,
+                    current.idx, current.len,
+                    "Expected ';' after " + text + " statement."
+                ));
+            res.advance();
+
+            if (text == "break")
+                return res.success(
+                    BreakNode().tokSource(start, previous)
+                );
+            return res.success(
+                ContinueNode().tokSource(start, previous)
+            );
+        } else if (match(TokenType.LBRACE, null)) {
+            res.advance();
+            beginScope();
+            const node = res.register(block());
+            if (res.hasError())
+                return res;
+            endScope();
+            return res.success(node);
+        } else {
+            return expressionStatement();
+        }
+
+        return ParseResult().failure(Error.InvalidSyntax(
+            current.filename, current.src,
+            current.idx, current.len,
+            "Expected a statement."
+        ));
+    }
+
+    func prv expressionStatement() {
+        const res = ParseResult();
+        const node = res.register(expression());
+        if (res.hasError())
+            return res;
+        if (!match(TokenType.SEMICOLON, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected ';' after expression."
+            ));
+        res.advance();
+        return res.success(node);
+    }
+
+    func prv expression() {
+        return parsePrecedence(Precedence.ASSIGNMENT);
+    }
+
+    func prv getRule(tokenType) {
+        if (npmap.has(rules, tokenType))
+            return npmap.get(rules, tokenType);
+        return [null, null, Precedence.NONE];
+    }
+
+    func prv parsePrecedence(prec) {
+        const res = ParseResult();
+        
+        advance(); 
+        res.advance();
+
+        const prefixRule = getRule(previous.tokenType)[0];
+        if (prefixRule == null)
+            return res.failure(Error.InvalidSyntax(
+                previous.filename, previous.src,
+                previous.idx, previous.len,
+                "Expected expression."
+            ));
+        
+        const canAssign = prec <= Precedence.ASSIGNMENT;
+        let node = res.register(prefixRule(canAssign));
+        if (res.hasError())
+            return res;
+
+        while (prec <= getRule(current.tokenType)[2]) {
+            advance();
+            res.advance();
+
+            const infixRule = getRule(previous.tokenType)[1];
+            node = res.register(infixRule(node, canAssign));
+            if (res.hasError())
+                return res;
+        }
+
+        if (canAssign && match(TokenType.EQUAL, null))
+            return res.failure(Error.InvalidSyntax(
+                previous.filename, previous.src,
+                previous.idx, previous.len,
+                "Cannot perform assignment here."
+            ));
+        res.advance();
+        
+        return res.success(node);
+    }
+
+    func prv grouping(canAssign) {
+        const res = ParseResult();
+
+        const node = res.register(expression());
+        if (res.hasError())
+            return res;
+        
+        if (!match(TokenType.RPAREN, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected ')' after expression."
+            ));
+        res.advance();
+        return res.success(node);
+    }
+
+    func prv valueList(terminator, msg) {
+        const res = ParseResult();
+
+        let args = npvec.vec();
+        while (current.tokenType != terminator) {
+            npvec.append(
+                args, 
+                res.register(expression())
+            );
+
+            if (res.hasError())
+                return res;
+            
+            if (!match(TokenType.COMMA, null))
+                break;
+            res.advance();
+        }
+
+        if (!match(terminator, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                msg
+            ));
+        res.advance();
+        return res.success(args);
+    }
+
+    func prv argumentList() {
+        return valueList(TokenType.RPAREN, "Expected ')' after arguments.");
+    }
+
+    func prv call(left, canAssign) {
+        const res = ParseResult();
+
+        const args = res.register(argumentList());
+        if (res.hasError())
+            return res;
+        
+        return res.success(
+            CallNode(left, args).setSource(
+                current.filename, current.src, left.idx, 
+                previous.idx + previous.len - left.idx
+            )
+        );
+    }
+
+    func prv dot(left, canAssign) {
+        const res = ParseResult();
+
+        if (!match(TokenType.IDENTIFIER, null))
+            return res.failure(Error.InvalidSyntax(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected property name after '.'."
+            ));
+        res.advance();
+
+        const name = previous.text;
+        if (canAssign && match(TokenType.EQUAL, null)) {
+            res.advance();
+            const node = res.register(expression());
+            if (res.hasError())
+                return res;
+            return res.success(
+                SetPropertyNode(left, name, node).setSource(
+                    left.filename, left.src, left.idx,
+                    previous.idx + previous.len - left.idx
+                )
+            );
+        } else if (match(TokenType.LPAREN, null)) {
+            res.advance();
+            const args = res.register(argumentList());
+            if (res.hasError())
+                return res;
+            return res.success(
+                InvokeNode(left, name, args).setSource(
+                    left.filename, left.src, left.idx,
+                    previous.idx + previous.len - left.idx
+                )
+            );
+        }
+
+        return res.success(
+            GetPropertyNode(left, name).setSource(
+                left.filename, left.src, left.idx,
+                previous.idx + previous.len - left.idx
+            )
+        );
+    }
+
+    func prv unary(canAssign) {
+        const res = ParseResult();
+
+        const tok = previous;
+        const node = res.register(parsePrecedence(Precedence.UNARY));
+        if (res.hasError())
+            return res;
+        
+        let opcode;
+        if (tok.tokenType == TokenType.MINUS)
+            opcode = OpCode.NEGATE;
+        else if (tok.tokenType == TokenType.BANG)
+            opcode = OpCode.NOT;
+        else if (tok.tokenType == TokenType.KEYWORD && tok.text == "unpack")
+            opcode = OpCode.UNPACK;
+        
+        return res.success(
+            UnaryNode(node, opcode).tokSource(tok, previous)
+        );
+    }
+
+    func prv binary(left, canAssign) {
+        const res = ParseResult();
+
+        const tok = previous;
+        const prec = getRule(tok.tokenType)[2];
+        const right = res.register(parsePrecedence(prec + 1));
+        if (res.hasError())
+            return res;
+        
+        let opcode;
+        if (tok.tokenType == TokenType.PLUS)
+            opcode = OpCode.ADD;
+        if (tok.tokenType == TokenType.MINUS)
+            opcode = OpCode.SUBTRACT;
+        if (tok.tokenType == TokenType.STAR)
+            opcode = OpCode.MULTIPLY;
+        if (tok.tokenType == TokenType.SLASH)
+            opcode = OpCode.DIVIDE;
+        if (tok.tokenType == TokenType.BANG_EQUAL)
+            opcode = OpCode.NOT_EQUAL;
+        if (tok.tokenType == TokenType.EQUAL_EQUAL)
+            opcode = OpCode.EQUAL;
+        if (tok.tokenType == TokenType.GREATER)
+            opcode = OpCode.GREATER;
+        if (tok.tokenType == TokenType.GREATER_EQUAL)
+            opcode = OpCode.GREATER_EQUAL;
+        if (tok.tokenType == TokenType.LESS)
+            opcode = OpCode.LESS;
+        if (tok.tokenType == TokenType.LESS_EQUAL)
+            opcode = OpCode.LESS_EQUAL;
+
+        return res.success(
+            BinaryNode(left, right, opcode).setSource(
+                left.filename, left.src, left.idx,
+                right.idx + right.len - left.idx
+            )
+        );
+    }
+
+    func prv variable(canAssign) {
+        // TODO: Implement variable parsing
+    }
+
+    func prv string(canAssign) {
+        return ParseResult().success(
+            StringNode(previous.text).tokSource(previous, previous)
+        );
+    }
+
+    func prv and(left, canAssign) {
+        const res = ParseResult();
+
+        const right = res.register(parsePrecedence(Precedence.AND));
+        if (res.hasError())
+            return res;
+        
+        return res.success(
+            AndNode(left, right).setSource(
+                left.filename, left.src, left.idx,
+                right.idx + right.len - left.idx
+            )
+        );
+    }
+
+    func prv keyword(canAssign) {
+        // TODO: Implement keyword parsing
+    }
+
+    func prv or(left, canAssign) {
+        const res = ParseResult();
+
+        const right = res.register(parsePrecedence(Precedence.OR));
+        if (res.hasError())
+            return res;
+        
+        return res.success(
+            OrNode(left, right).setSource(
+                left.filename, left.src, left.idx,
+                right.idx + right.len - left.idx
+            )
+        );
+    }
+
+    func prv list(canAssign) {
+        const res = ParseResult();
+
+        const start = previous;
+
+        const args = res.register(valueList(TokenType.RBRACKET, "Expected ']' after list."));
+        if (res.hasError())
+            return res;
+        
+        return res.success(
+            ListNode(args).tokSource(start, previous)
+        );
+    }
+
+    func prv index(left, canAssign) {
+        const res = ParseResult();
+
+        const right = res.register(parsePrecedence(Precedence.CALL));
+        if (res.hasError())
+            return res;
+        
+        if (!match(TokenType.RBRACKET, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected ']' after index."
+            ));
+        res.advance();
+        
+        if (canAssign && match(TokenType.EQUAL, null)) {
+            res.advance();
+            const val = res.register(expression());
+            if (res.hasError())
+                return res;
+            return res.success(
+                SetIndexNode(left, right, val).setSource(
+                    left.filename, left.src, left.idx,
+                    val.idx + val.len - left.idx
+                )
+            );
+        }
+        
+        return res.success(
+            GetIndexNode(left, right).setSource(
+                left.filename, left.src, left.idx,
+                right.idx + right.len - left.idx
+            )
+        );
+    }
     
+    func prv number(canAssign) {
+        return ParseResult().success(
+            NumberNode(std.strtod(previous.text)).tokSource(previous, previous)
+        );
+    }
 
 }

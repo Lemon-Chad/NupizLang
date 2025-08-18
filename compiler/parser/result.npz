@@ -98,7 +98,7 @@ class ParseResult {
     }
 
     func pub register(res) {
-        advance += res.advances;
+        advances += res.advances;
         if (res.error != null) {
             error = res.error;
         }
@@ -114,5 +114,13 @@ class ParseResult {
         if (this.error == null || advances == 0)
             this.error = error;
         return this;
+    }
+
+    func pub hasError() {
+        return error != null;
+    }
+
+    func pub printError() {
+        std.println(std.asString(error));
     }
 }

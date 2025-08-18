@@ -1,0 +1,70 @@
+import std;
+import npvec;
+unpack import "./node.npz";
+
+class FuncType {
+    const pub static FUNCTION = 0;
+}
+
+class BodyNode <- Node {
+    let prv nodes;
+
+    build(val) {
+        nodes = val;
+        type = NodeType.BODY;
+    }
+
+    func getChildren() {
+        return nodes;
+    }
+
+    func def string() {
+        let res = "Body(\n";
+        for (let i = 0; i < npvec.size(nodes); i += 1)
+            res += std.asString(npvec.at(nodes, i)) + ";\n";
+        res += ")";
+        return res;
+    }
+}
+
+class FuncNode <- Node {
+    let prv args;
+    let prv body;
+
+    build(oArgs, oBody) {
+        args = oArgs;
+        body = oBody;
+
+        type = NodeType.FUNCTION;
+    }
+
+    func getChildren() {
+        return npvec.vec(body);
+    }
+
+    func def string() {
+        let res = "Func((";
+        for (let i = 0; i < npvec.size(args); i += 1)
+            res += npvec.at(args, i) + ", ";
+        return std.slice(res, 0, -3) + ") -> " + 
+            std.asString(body) + ")";
+    }
+}
+
+class ReturnNode <- Node {
+    let prv val;
+
+    build(oVal) {
+        val = oVal;
+
+        type = NodeType.RETURN;
+    }
+
+    func getChildren() {
+        return npvec.vec(val);
+    }
+
+    func def string() {
+        return "Return(" + std.asString(val) + ")";
+    }
+}

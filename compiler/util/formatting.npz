@@ -122,7 +122,7 @@ func underlineCode(src, idx, len) {
         const marginLength = std.length(margin);
 
         return std.asString(lineNo) + ":: " + std.slice(line, marginLength, -1) + "\n"
-            + std.repeat(" ", numLength + 3 + idx - start) + 
+            + std.repeat(" ", numLength + 3 + idx - start - marginLength) + 
             highlightBar(len);
     }
 

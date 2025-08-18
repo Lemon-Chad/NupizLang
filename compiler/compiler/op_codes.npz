@@ -1,0 +1,106 @@
+
+class OpCode {
+    const pub static CONSTANT           =  0;
+    const pub static CONSTANT_LONG      =  1;
+    const pub static NULL               =  2;
+    const pub static DEFINE_GLOBAL      =  3;
+    const pub static SET_GLOBAL         =  4;
+    const pub static GET_GLOBAL         =  5;
+    const pub static SET_LOCAL          =  6;
+    const pub static GET_LOCAL          =  7;
+    const pub static SET_UPVALUE        =  8;
+    const pub static GET_UPVALUE        =  9;
+    const pub static LOOP               = 10;
+    const pub static JUMP               = 11;
+    const pub static JUMP_IF_FALSE      = 12;
+    const pub static JUMP_IF_TRUE       = 13;
+    const pub static TRUE               = 14;
+    const pub static FALSE              = 15;
+    const pub static NOT                = 16;
+    const pub static EQUAL              = 17;
+    const pub static NOT_EQUAL          = 18;
+    const pub static GREATER            = 19;
+    const pub static GREATER_EQUAL      = 20;
+    const pub static LESS               = 21;
+    const pub static LESS_EQUAL         = 22;
+    const pub static NEGATE             = 23;
+    const pub static ADD                = 24;
+    const pub static SUBTRACT           = 25;
+    const pub static MULTIPLY           = 26;
+    const pub static DIVIDE             = 27;
+    const pub static RETURN             = 28;
+    const pub static POP                = 29;
+    const pub static PN                 = 30;
+    const pub static CLOSE_UPVALUE      = 31;
+    const pub static CALL               = 32;
+    const pub static CLOSURE            = 33;
+    const pub static CLASS              = 34;
+    const pub static METHOD             = 35;
+    const pub static GET_PROPERTY       = 36;
+    const pub static SET_PROPERTY       = 37;
+    const pub static INVOKE             = 38;
+    const pub static INHERIT            = 39;
+    const pub static GET_SUPER          = 40;
+    const pub static SUPER_INVOKE       = 41;
+    const pub static MAKE_LIST          = 42;
+    const pub static GET_INDEX          = 43;
+    const pub static SET_INDEX          = 44;
+    const pub static IMPORT             = 45;
+    const pub static UNPACK             = 46;
+    const pub static ATTRIBUTE          = 47;
+    const pub static IMPORT_FILE        = 48;
+
+    func pub static toString(opCode) {
+        return [
+            "CONSTANT",
+            "CONSTANT_LONG",
+            "NULL",
+            "DEFINE_GLOBAL",
+            "SET_GLOBAL",
+            "GET_GLOBAL",
+            "SET_LOCAL",
+            "GET_LOCAL",
+            "SET_UPVALUE",
+            "GET_UPVALUE",
+            "LOOP",
+            "JUMP",
+            "JUMP_IF_FALSE",
+            "JUMP_IF_TRUE",
+            "TRUE",
+            "FALSE",
+            "!",
+            "=",
+            "!=",
+            ">",
+            ">=",
+            "<",
+            "<=",
+            "-",
+            "+",
+            "-",
+            "*",
+            "/",
+            "RETURN",
+            "POP",
+            "POP_N",
+            "CLOSE_UPVALUE",
+            "CALL",
+            "CLOSURE",
+            "CLASS",
+            "METHOD",
+            "GET_PROPERTY",
+            "SET_PROPERTY",
+            "INVOKE",
+            "INHERIT",
+            "GET_SUPER",
+            "SUPER_INVOKE",
+            "MAKE_LIST",
+            "GET_INDEX",
+            "SET_INDEX",
+            "IMPORT",
+            "UNPACK",
+            "ATTRIBUTE",
+            "IMPORT_FILE"
+        ][opCode];
+    }
+}

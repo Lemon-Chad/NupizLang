@@ -1,12 +1,12 @@
 import std;
 
 class NamingConvention {
-    const pub static CAMEL_CASE = 0;
-    const pub static SCREAMING_SNAKE_CASE = 1;
-    const pub static PASCAL_CASE = 2;
-    const pub static SNAKE_CASE = 3;
-    const pub static MIXED_SNAKE_CASE = 4;
-    const pub static NONE = 5;
+    const pub static CAMEL_CASE             = 0;
+    const pub static SCREAMING_SNAKE_CASE   = 1;
+    const pub static PASCAL_CASE            = 2;
+    const pub static SNAKE_CASE             = 3;
+    const pub static MIXED_SNAKE_CASE       = 4;
+    const pub static NONE                   = 5;
 
     func pub static stringConvention(conv) {
         if (conv == CAMEL_CASE)

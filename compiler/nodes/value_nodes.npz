@@ -47,7 +47,7 @@ class StringNode <- Node {
     }
 
     func def string() {
-        return value;
+        return "\"" + value + "\"";
     }
 }
 
@@ -59,11 +59,15 @@ class ListNode <- Node {
         type = NodeType.LIST;
     }
 
+    func getChildren() {
+        return value;
+    }
+
     func def string() {
         let str = "[";
         const n = npvec.size(value);
 
-        for (int i = 0; i < n; i += 1) {
+        for (let i = 0; i < n; i += 1) {
             const k = npvec.at(value, i);
 
             if (k.getType() == NodeType.STRING) {

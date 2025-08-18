@@ -1,0 +1,238 @@
+import std;
+import npvec;
+
+unpack import "../compiler/op_codes.npz";
+unpack import "./node.npz";
+
+class BinaryNode <- Node {
+    let prv left;
+    let prv right;
+    let prv opCode;
+
+    build(l, r, op) {
+        left = l;
+        right = r;
+        opCode = op;
+
+        type = NodeType.BINARY;
+    }
+
+    func getChildren() {
+        return npvec.vec(left, right);
+    }
+
+    func def string() {
+        return std.asString(left) + " " +
+            OpCode.toString(opCode) + " " +
+            std.asString(right);
+    }
+}
+
+class UnaryNode <- Node {
+    let prv operand;
+    let prv opCode;
+
+    build(oOperand, op) {
+        operand = oOperand;
+        opCode = op;
+
+        type = NodeType.UNARY;
+    }
+
+    func getChildren() {
+        return npvec.vec(left, right);
+    }
+
+    func def string() {
+        return OpCode.toString(opCode) + std.asString(operand);
+    }
+}
+
+class CallNode <- Node {
+    let prv operand;
+    let prv args;
+    let prv argc;
+
+    build(oOperand, oArgs) {
+        operand = oOperand;
+        args = oArgs;
+        argc = npvec.size(args);
+
+        type = NodeType.CALL;
+    }
+
+    func getChildren() {
+        const res = npvec.vec(operand);
+        for (let i = 0; i < argc; i += 1)
+            npvec.append(res, npvec.at(args, i));
+        return res;
+    }
+
+    func def string() {
+        let res = "Call(" + std.asString(operand) + ", [";
+        for (let i = 0; i < argc; i += 1)
+            res += std.asString(npvec.at(args, i)) + ", ";
+        return std.slice(res, 0, -3) + "])";
+    }
+}
+
+class InvokeNode <- Node {
+    let prv operand;
+    let prv name;
+    let prv args;
+    let prv argc;
+
+    build(oOperand, oName, oArgs) {
+        operand = oOperand;
+        name = oName;
+        args = oArgs;
+        argc = npvec.size(args);
+
+        type = NodeType.INVOKE;
+    }
+
+    func getChildren() {
+        const res = npvec.vec(operand);
+        for (let i = 0; i < argc; i += 1)
+            npvec.append(res, npvec.at(args, i));
+        return res;
+    }
+
+    func def string() {
+        let res = "Invoke(" + std.asString(operand) + ", '" + name + "', [";
+        for (let i = 0; i < argc; i += 1)
+            res += std.asString(npvec.at(args, i)) + ", ";
+        return std.slice(res, 0, -3) + "])";
+    }
+}
+
+class GetPropertyNode <- Node {
+    let prv operand;
+    let prv name;
+
+    build(oOperand, oName) {
+        operand = oOperand;
+        name = oName;
+
+        type = NodeType.GET_PROPERTY;
+    }
+
+    func getChildren() {
+        return npvec.vec(operand);
+    }
+
+    func def string() {
+        return "GetProperty(" + std.asString(operand) + 
+            ", '" + name + "')";
+    }
+}
+
+class SetPropertyNode <- Node {
+    let prv operand;
+    let prv name;
+    let prv val;
+
+    build(oOperand, oName, oVal) {
+        operand = oOperand;
+        name = oName;
+        val = oVal;
+
+        type = NodeType.SET_PROPERTY;
+    }
+
+    func getChildren() {
+        return npvec.vec(operand, val);
+    }
+
+    func def string() {
+        return "SetProperty(" + std.asString(operand) + 
+            ", '" + name + "', " + std.asString(val) + ")";
+    }
+}
+
+class GetIndexNode <- Node {
+    let prv operand;
+    let prv index;
+
+    build(oOperand, oIndex) {
+        operand = oOperand;
+        index = oIndex;
+
+        type = NodeType.GET_INDEX;
+    }
+
+    func getChildren() {
+        return npvec.vec(operand, index);
+    }
+
+    func def string() {
+        return "GetIndex(" + std.asString(operand) + 
+            ", " + std.asString(index) + ")";
+    }
+}
+
+class SetIndexNode <- Node {
+    let prv operand;
+    let prv index;
+    let prv val;
+
+    build(oOperand, oIndex, oVal) {
+        operand = oOperand;
+        index = oIndex;
+        val = oVal;
+
+        type = NodeType.SET_INDEX;
+    }
+
+    func getChildren() {
+        return npvec.vec(operand, index, val);
+    }
+
+    func def string() {
+        return "SetIndex(" + std.asString(operand) + 
+            ", " + std.asString(index) + 
+            ", " + std.asString(val) + ")";
+    }
+}
+
+class AndNode <- Node {
+    let prv left;
+    let prv right;
+
+    build(l, r) {
+        left = l;
+        right = r;
+
+        type = NodeType.AND;
+    }
+
+    func getChildren() {
+        return npvec.vec(left, right);
+    }
+
+    func def string() {
+        return "And(" + std.asString(left) + 
+            ", " + std.asString(right) + ")";
+    }
+}
+
+class OrNode <- Node {
+    let prv left;
+    let prv right;
+
+    build(l, r) {
+        left = l;
+        right = r;
+
+        type = NodeType.OR;
+    }
+
+    func getChildren() {
+        return npvec.vec(left, right);
+    }
+
+    func def string() {
+        return "Or(" + std.asString(left) + 
+            ", " + std.asString(right) + ")";
+    }
+}

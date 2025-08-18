@@ -1,0 +1,128 @@
+import std;
+unpack import "./node.npz";
+
+class DeclareGlobalNode <- Node {
+    let prv name;
+    let prv val;
+    let prv isConstant;
+
+    build(oName, oVal, oIsConstant) {
+        name = oName;
+        val = oVal;
+        isConstant = oIsConstant;
+
+        type = NodeType.DECLARE_GLOBAL;
+    }
+
+    func getChildren() {
+        return npvec.vec(val);
+    }
+
+    func def string() {
+        return "DeclareGlobal('" + name + 
+            "', " + std.asString(val) + ")";
+    }
+}
+
+class SetGlobalNode <- Node {
+    let prv name;
+    let prv val;
+
+    build(oName, oVal) {
+        name = oName;
+        val = oVal;
+
+        type = NodeType.SET_GLOBAL;
+    }
+
+    func getChildren() {
+        return npvec.vec(val);
+    }
+
+    func def string() {
+        return "SetGlobal('" + name + 
+            "', " + std.asString(val) + ")";
+    }
+}
+
+class GetGlobalNode <- Node {
+    let prv name;
+
+    build(oName) {
+        name = oName;
+
+        type = NodeType.GET_GLOBAL;
+    }
+
+    func getChildren() {
+        return npvec.vec();
+    }
+
+    func def string() {
+        return "GetGlobal('" + name + "')";
+    }
+}
+
+class DeclareLocalNode <- Node {
+    let prv name;
+    let prv val;
+    let prv isConstant;
+
+    build(oName, oVal, oIsConstant) {
+        name = oName;
+        val = oVal;
+        isConstant = oIsConstant;
+
+        type = NodeType.DECLARE_LOCAL;
+    }
+
+    func getChildren() {
+        return npvec.vec(val);
+    }
+
+    func def string() {
+        return "DeclareLocal('" + name + 
+            "', " + std.asString(val) + ")";
+    }
+}
+
+class SetLocalNode <- Node {
+    let prv name;
+    let prv val;
+
+    build(oName, oVal) {
+        name = oName;
+        val = oVal;
+
+        type = NodeType.SET_LOCAL;
+    }
+
+    func getChildren() {
+        return npvec.vec(val);
+    }
+
+    func def string() {
+        return "SetLocal('" + name + 
+            "', " + std.asString(val) + ")";
+    }
+}
+
+class GetLocalNode <- Node {
+    let prv name;
+
+    build(oName) {
+        name = oName;
+
+        type = NodeType.GET_LOCAL;
+    }
+
+    func getChildren() {
+        return npvec.vec();
+    }
+
+    func def string() {
+        return "GetLocal('" + name + "')";
+    }
+}
+
+

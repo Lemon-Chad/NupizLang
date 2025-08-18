@@ -1,0 +1,49 @@
+import std;
+import npvec;
+unpack import "./node.npz";
+
+class IfNode <- Node {
+    let prv condition;
+    let prv ifTrue;
+    let prv ifFalse;
+
+    build(oCondition, oTrue, oFalse) {
+        condition = oCondition;
+        ifTrue = oTrue;
+        ifFalse = oFalse;
+    }
+
+    func getChildren() {
+        if (ifFalse == null)
+            return npvec.vec(condition, ifTrue);
+        return npvec.vec(condition, ifTrue, ifFalse);
+    }
+
+    func def string() {
+        let res = "If([" + std.asString(condition) + "] -> " +
+            std.asString(ifTrue);
+        if (ifFalse == null)
+            return res + ")";
+        return res + " Else " + std.asString(ifFalse) + ")";
+    }
+}
+
+class BreakNode <- Node {
+    build() {
+        type = NodeType.BREAK;
+    }
+
+    func def string() {
+        return "Break";
+    }
+}
+
+class ContinueNode <- Node {
+    build() {
+        type = NodeType.CONTINUE;
+    }
+
+    func def string() {
+        return "Continue";
+    }
+}

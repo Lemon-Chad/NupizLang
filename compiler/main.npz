@@ -18,17 +18,23 @@ func main(args) {
     iofile.closeFile(fp);
 
     const lexer = lexerPkg.Lexer(filename, src);
-    let hasError = !lexer.lex();
+    const hasError = !lexer.lex();
     if (hasError) {
         lexer.printError();
         return;
     }
 
-    // lexer.printTokens();
+    lexer.printTokens();
 
-    std.println(std.asString(resPkg.Error.InvalidSyntax(
-        filename, src, 40, 45, "Your code looks dumb."
-    )));
+    const parser = parserPkg.Parser(lexer.getTokens());
+    const res = parser.parse();
+    if (res.hasError()) {
+        res.printError();
+        return;
+    }
+
+    std.println("out: ");
+    std.println(std.asString(res.val));
 }
 
 std.main(main);

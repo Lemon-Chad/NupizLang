@@ -1,15 +1,38 @@
 import npvec;
 
 class NodeType {
-    const pub static NUMBER         =   0;
-    const pub static BOOLEAN        =   1;
-    const pub static NULL           =   2;
-    const pub static LIST           =   3;
-    const pub static STRING         =   4;
+    const pub static NUMBER         =    0;
+    const pub static BOOLEAN        =    1;
+    const pub static NULL           =    2;
+    const pub static LIST           =    3;
+    const pub static STRING         =    4;
+    const pub static BODY           =    5;
+    const pub static UNARY          =    6;
+    const pub static BINARY         =    7;
+    const pub static CALL           =    8;
+    const pub static SET_PROPERTY   =    9;
+    const pub static GET_PROPERTY   =   10;
+    const pub static INVOKE         =   11;
+    const pub static GET_INDEX      =   12;
+    const pub static SET_INDEX      =   13;
+    const pub static DECLARE_GLOBAL =   14;
+    const pub static SET_GLOBAL     =   15;
+    const pub static GET_GLOBAL     =   16;
+    const pub static DECLARE_LOCAL  =   17;
+    const pub static SET_LOCAL      =   18;
+    const pub static GET_LOCAL      =   19;
+    const pub static FUNCTION       =   20;
+    const pub static RETURN         =   21;
+    const pub static BREAK          =   22;
+    const pub static CONTINUE       =   23;
 }
 
 class Node {
     let prv type;
+    let pub filename = null;
+    let pub src = null;
+    let pub idx = -1;
+    let pub len = -1;
 
     func pub getChildren() {
         return npvec.vec();
@@ -17,5 +40,37 @@ class Node {
 
     func pub getType() {
         return type;
+    }
+
+    func pub getFilename() {
+        return filename;
+    }
+
+    func pub getSrc() {
+        return src;
+    }
+
+    func pub getIdx() {
+        return idx;
+    }
+
+    func pub getLen() {
+        return len;
+    }
+
+    func pub setSource(filename, src, idx, len) {
+        this.filename = filename;
+        this.src = src;
+        this.idx = idx;
+        this.len = len;
+        return this;
+    }
+
+    func pub tokSource(start, end) {
+        filename = start.filename;
+        src = start.src;
+        idx = start.idx;
+        len = end.idx + end.len - start.idx;
+        return this;
     }
 }

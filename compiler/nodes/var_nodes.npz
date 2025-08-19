@@ -125,4 +125,22 @@ class GetLocalNode <- Node {
     }
 }
 
+class ThisNode <- Node {
+    build() {
+        type = NodeType.THIS;
+    }
 
+    func def string() {
+        return "this";
+    }
+}
+
+class SuperNode <- Node {
+    build() {
+        type = NodeType.SUPER;
+    }
+
+    func def string() {
+        return "super";
+    }
+}

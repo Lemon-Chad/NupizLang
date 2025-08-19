@@ -25,6 +25,12 @@ class NodeType {
     const pub static RETURN         =   21;
     const pub static BREAK          =   22;
     const pub static CONTINUE       =   23;
+    const pub static WHILE          =   24;
+    const pub static FOR            =   25;
+    const pub static CLASS          =   26;
+    const pub static IMPORT         =   27;
+    const pub static THIS           =   28;
+    const pub static SUPER          =   29;
 }
 
 class Node {

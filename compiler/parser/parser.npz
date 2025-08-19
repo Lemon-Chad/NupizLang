@@ -407,7 +407,7 @@ class Parser {
         if (res.hasError())
             return false;
         
-        let ifFalse = null;
+        let ifFalse;
         if (match(TokenType.KEYWORD, "else")) {
             res.advance();
             ifFalse = res.register(statement());
@@ -417,6 +417,106 @@ class Parser {
 
         return res.success(
             IfNode(condition, ifTrue, ifFalse)
+                .tokSource(start, previous)
+        );
+    }
+
+    func prv whileStatement() {
+        const res = ParseResult();
+        const start = previous;
+
+        if (!match(TokenType.LPAREN, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected '(' before loop condition."
+            ));
+        res.advance();
+
+        const condition = res.register(expression());
+        if (res.hasError())
+            return res;
+        
+        if (!match(TokenType.RPAREN, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected ')' after loop condition."
+            ));
+        res.advance();
+
+        const body = res.register(statement());
+        if (res.hasError())
+            return res;
+        
+        return res.success(
+            WhileNode(condition, body)
+                .tokSource(start, previous)
+        );
+    }
+
+    func prv forStatement() {
+        const res = ParseResult();
+        const start = previous;
+        beginScope();
+
+        if (!match(TokenType.LPAREN, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected '(' before loop initializer."
+            ));
+        res.advance();
+
+        let initializer;
+        if (match(TokenType.KEYWORD, "var") || match(TokenType.KEYWORD, "let")) {
+            res.advance();
+            initializer = res.register(varDeclaration(false));
+        } else if (!match(TokenType.SEMICOLON, null)) {
+            initializer = res.register(expressionStatement());
+        } else {
+            res.advance();
+        }
+
+        if (res.hasError())
+            return res;
+        
+        let condition;
+        if (!match(TokenType.SEMICOLON, null)) {
+            condition = res.register(expression());
+            if (res.hasError())
+                return res;
+            if (!match(TokenType.SEMICOLON, null))
+                return res.failure(Error.ExpectedCharError(
+                    current.filename, current.src,
+                    current.idx, current.len,
+                    "Expected ';' after loop condition."
+                ));
+        }
+        res.advance();
+
+        let iterator;
+        if (!match(TokenType.RPAREN, null)) {
+            iterator = res.register(expression());
+            if (res.hasError())
+                return res;
+            if (!match(TokenType.RPAREN, null))
+                return res.failure(Error.ExpectedCharError(
+                    current.filename, current.src,
+                    current.idx, current.len,
+                    "Expected ')' after loop iterator."
+                ));
+        }
+        res.advance();
+
+        const body = res.register(statement());
+        if (res.hasError())
+            return res;
+        
+        endScope();
+        
+        return res.success(
+            ForNode(initializer, condition, iterator, body)
                 .tokSource(start, previous)
         );
     }
@@ -437,10 +537,16 @@ class Parser {
             return res.success(node);
         } else if (match(TokenType.KEYWORD, "while")) {
             res.advance();
-            // TODO: Implement while loops
+            const node = res.register(whileStatement());
+            if (res.hasError())
+                return res;
+            return res.success(node);
         } else if (match(TokenType.KEYWORD, "for")) {
             res.advance();
-            // TODO: Implement for loops
+            const node = res.register(forStatement());
+            if (res.hasError())
+                return res;
+            return res.success(node);
         } else if (match(TokenType.KEYWORD, "break") ||
                 match(TokenType.KEYWORD, "continue")) {
             res.advance();
@@ -715,7 +821,53 @@ class Parser {
     }
 
     func prv variable(canAssign) {
-        // TODO: Implement variable parsing
+        const res = ParseResult();
+        const tok = previous;
+
+        let getter;
+        let setter;
+        if (resolveLocal(tok.text)) {
+            getter = GetLocalNode;
+            setter = SetLocalNode;
+        } else {
+            getter = GetGlobalNode;
+            setter = SetGlobalNode;
+        }
+
+        let assignmentOp = -2;
+        if (canAssign) {
+            if (match(TokenType.EQUAL, null))
+                assignmentOp = -1;
+            else if (match(TokenType.PLUS_EQUAL, null))
+                assignmentOp = OpCode.ADD;
+            else if (match(TokenType.MINUS_EQUAL, null))
+                assignmentOp = OpCode.SUBTRACT;
+            else if (match(TokenType.STAR_EQUAL, null))
+                assignmentOp = OpCode.MULTIPLY;
+            else if (match(TokenType.SLASH_EQUAL, null))
+                assignmentOp = OpCode.DIVIDE;
+        }
+
+        if (assignmentOp == -2)
+            return res.success(
+                getter(tok.text)
+                    .tokSource(tok, tok)
+            );
+        res.advance();
+
+        let val = res.register(expression());
+        if (res.hasError())
+            return res;
+        
+        if (assignmentOp != -1)
+            val = BinaryNode(
+                getter(tok.text).tokSource(tok, tok), 
+                val, assignmentOp).tokSource(tok, previous);
+        
+        return res.success(
+            setter(tok.text, val)
+                .tokSource(tok, previous)
+        );
     }
 
     func prv string(canAssign) {
@@ -740,7 +892,38 @@ class Parser {
     }
 
     func prv keyword(canAssign) {
-        // TODO: Implement keyword parsing
+        const res = ParseResult();
+        const tok = previous;
+        if (tok.text == "true" || tok.text == "false") {
+            return res.success(
+                BooleanNode(tok.text == "true")
+                    .tokSource(previous, previous)
+            );
+        } else if (tok.text == "null") {
+            return res.success(
+                NullNode()
+                    .tokSource(previous, previous)
+            );
+        } else if (tok.text == "unpack") {
+            return unary(canAssign);
+        } else if (tok.text == "this") {
+            return res.success(
+                ThisNode()
+                    .tokSource(previous, previous)
+            );
+        } else if (tok.text == "super") {
+            return res.success(
+                SuperNode()
+                    .tokSource(previous, previous)
+            );
+        } else if (tok.text == "import") {
+            // TODO: Imports.
+        }
+        return res.failure(Error.InvalidSyntax(
+            previous.filename, previous.src,
+            previous.idx, previous.len,
+            "Unexpected keyword '" + previous.text + "'."
+        ));
     }
 
     func prv or(left, canAssign) {

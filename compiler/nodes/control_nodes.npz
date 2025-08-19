@@ -47,3 +47,61 @@ class ContinueNode <- Node {
         return "Continue";
     }
 }
+
+class WhileNode <- Node {
+    let prv condition;
+    let prv body;
+
+    build(oCondition, oBody) {
+        condition = oCondition;
+        body = oBody;
+
+        type = NodeType.WHILE;
+    }
+
+    func getChildren() {
+        return npvec.vec(condition, body);
+    }
+
+    func def string() {
+        return "While(" + std.asString(condition) + 
+            " -> " + std.asString(body) + ")";
+    }
+}
+
+class ForNode <- Node {
+    let prv initializer;
+    let prv condition;
+    let prv iterator;
+    let prv body;
+
+    build(oInitializer, oCondition, oIterator, oBody) {
+        initializer = oInitializer;
+        condition = oCondition;
+        iterator = oIterator;
+        body = oBody;
+
+        type = NodeType.FOR;
+    }
+
+    func getChildren() {
+        return npvec.vec(initializer, condition, iterator, body);
+    }
+
+    func def string() {
+        let res = "For([";
+
+        if (initializer != null)
+            res += std.asString(initializer);
+        res += ";";
+
+        if (condition != null)
+            res += " " + std.asString(condition);
+        res += ";";
+
+        if (iterator != null)
+            res += " " + std.asString(iterator);
+        res += "] -> " + std.asString(body) + ")";
+        return res;
+    }
+}

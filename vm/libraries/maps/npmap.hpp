@@ -3,11 +3,11 @@
 #define jp_npmap_h
 
 #include <unordered_map>
+#include "../../util/hashvalue.hpp"
 
 extern "C" {
 
 #include "../core/extension.h"
-#include "../../util/hashvalue.hpp"
 
 typedef std::unordered_map<HashValue, Value, ValueHash> unordered_valmap;
 

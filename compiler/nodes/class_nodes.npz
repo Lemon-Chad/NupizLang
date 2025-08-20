@@ -1,0 +1,160 @@
+import std;
+import npvec;
+import npmap;
+unpack import "./node.npz";
+
+class AttrNode <- Node {
+    let prv name;
+    let prv val;
+    let prv isConstant;
+    let prv isPrivate;
+    let prv isStatic;
+
+    build(oName, oVal, oConstant, oPrivate, oStatic) {
+        name = oName;
+        val = oVal;
+        isConstant = oConstant;
+        isPrivate = oPrivate;
+        isStatic = oStatic;
+
+        type = NodeType.ATTRIBUTE;
+    }
+
+    func getChildren() {
+        return npvec.vec(val);
+    }
+
+    func def string() {
+        let res = "Attr(";
+        if (isConstant)
+            res += "const ";
+        if (isPrivate)
+            res += "prv ";
+        else
+            res += "pub ";
+        if (isStatic)
+            res += "static ";
+        res += name + " = " + std.asString(val);
+        return res + ")";
+    }
+
+    func getName() {
+        return name;
+    }
+}
+
+class MethodNode <- Node {
+    let prv name;
+    let prv function;
+    let prv isPrivate;
+    let prv isStatic;
+    let prv isDefault;
+
+    build(oName, oFunction, oPrivate, oStatic, oDefault) {
+        name = oName;
+        function = oFunction;
+        isPrivate = oPrivate;
+        isStatic = oStatic;
+        isDefault = oDefault;
+
+        type = NodeType.METHOD;
+    }
+
+    func getChildren() {
+        return npvec.vec(inner);
+    }
+
+    func def string() {
+        let res = "Method(";
+
+        if (isDefault)
+            res += "def ";
+        else if (isPrivate)
+            res += "prv ";
+        else
+            res += "pub ";
+        
+        if (isStatic)
+            res += "static ";
+        
+        res += name + " = " + std.asString(function);
+        return res + ")";
+    }
+
+    func getName() {
+        return name;
+    }
+}
+
+class ClassNode <- Node {
+    let prv name;
+    let prv superclass;
+    let prv builder;
+    let prv methods;
+    let prv fields;
+
+    build(oName, oSuperclass, oBuilder, oMethods, oFields) {
+        name = oName;
+        superclass = oSuperclass;
+        builder = oBuilder;
+        methods = oMethods;
+        fields = oFields;
+
+        type = NodeType.CLASS;
+    }
+
+    func getChildren() {
+        const children = npvec.vec();
+        if (superclass != null)
+            npvec.append(children, superclass);
+        if (builder != null)
+            npvec.append(children, builder);
+        
+        const methodKeys = npmap.keys(methods);
+        for (let i = 0; i < npvec.size(methodKeys); i += 1)
+            npvec.append(
+                children, 
+                npmap.get(
+                    methods, 
+                    npvec.at(methodKeys, i)
+                )
+            );
+        
+        const fieldKeys = npmap.keys(fields);
+        for (let i = 0; i < npvec.size(fieldKeys); i += 1)
+            npvec.append(
+                children, 
+                npmap.get(
+                    fields, 
+                    npvec.at(fieldKeys, i)
+                )
+            );
+        
+        return children;
+    }
+
+    func def string() {
+        let res = "Class(" + name;
+        if (superclass != null)
+            res += " <- " + std.asString(superclass);
+        res += "\n";
+        
+        const fieldKeys = npmap.keys(fields);
+        for (let i = 0; i < npvec.size(fieldKeys); i += 1)
+            res += "attr -> " + std.asString(npmap.get(
+                fields, 
+                npvec.at(fieldKeys, i)
+            )) + "\n";
+        
+        if (builder != null)
+            res += "builder -> " + std.asString(builder) + "\n";
+        
+        const methodKeys = npmap.keys(methods);
+        for (let i = 0; i < npvec.size(methodKeys); i += 1)
+            res += "method -> " + std.asString(npmap.get(
+                methods, 
+                npvec.at(methodKeys, i)
+            )) + "\n";
+        return res + ")";
+    }
+}

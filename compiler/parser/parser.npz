@@ -1,6 +1,10 @@
+import iofile;
 import std;
 import npvec;
 import npmap;
+
+const lexerPkg = import "../lexer/lexer.npz";
+const formatPkg = import "../util/formatting.npz";
 
 unpack import "./result.npz";
 unpack import "../lexer/token.npz";
@@ -11,6 +15,7 @@ unpack import "../nodes/op_nodes.npz";
 unpack import "../nodes/value_nodes.npz";
 unpack import "../nodes/var_nodes.npz";
 unpack import "../nodes/control_nodes.npz";
+unpack import "../nodes/class_nodes.npz";
 
 unpack import "../compiler/op_codes.npz";
 
@@ -31,6 +36,8 @@ class Precedence {
 class Parser {
     const prv debug = false;
 
+    let prv path;
+
     let prv previous;
     let prv current;
     let prv tokens;
@@ -41,7 +48,10 @@ class Parser {
     let prv scopeDepth;
     let prv ctxStack;
 
-    build(toks) {
+    let prv importedASTs;
+
+    build(filePath, toks) {
+        path = filePath;
         tokens = toks;
         let burger = 4;
     
@@ -75,6 +85,8 @@ class Parser {
 
         scopeDepth = 0;
         ctxStack = npvec.vec();
+
+        importedASTs = npmap.map();
     }
 
     func prv beginScope() {
@@ -135,9 +147,20 @@ class Parser {
         return false;
     }
 
+    func pub inheritASTs(asts) {
+        const keys = npmap.keys(asts);
+        for (let i = 0; i < npvec.size(keys); i += 1) {
+            const key = npvec.at(keys, i);
+            npmap.emplace(importedASTs, key, npmap.get(asts, key));
+        }
+    }
+
     func pub parse() {
         const res = ParseResult();
         const nodes = npvec.vec();
+
+        const ast = BodyNode(nodes);
+        npmap.emplace(importedASTs, path, ast);
 
         const start = current;
 
@@ -157,7 +180,7 @@ class Parser {
         }
 
         return res.success(
-            BodyNode(nodes).tokSource(start, current)
+            ast.tokSource(start, current)
         );
     }
 
@@ -180,7 +203,10 @@ class Parser {
             return res.success(node);
         } else if (match(TokenType.KEYWORD, "class")) {
             res.advance();
-            // TODO: Class declaration
+            const node = res.register(classDeclaration());
+            if (res.hasError())
+                return res;
+            return res.success(node);
         } else {
             return statement();
         }
@@ -342,6 +368,222 @@ class Parser {
         
         return res.success(
             declareVariable(name, fn, true)
+                .tokSource(start, previous)
+        );
+    }
+
+    func prv parseAttribute() {
+        const res = ParseResult();
+        const start = previous;
+        
+        const isConstant = previous.text == "const";
+
+        let isStatic = false;
+        let isPrivate = true;
+
+        if (match(TokenType.KEYWORD, "pub")) {
+            res.advance();
+            isPrivate = false;
+        }
+
+        if (isPrivate && match(TokenType.KEYWORD, "prv"))
+            res.advance();
+        
+        if (match(TokenType.KEYWORD, "static")) {
+            res.advance();
+            isStatic = true;
+        }
+
+        const name = res.register(getIdentifier());
+        let val = NullNode().tokSource(previous, previous);
+        if (match(TokenType.EQUAL, null)) {
+            res.advance();
+            val = res.register(expression());
+            if (res.hasError())
+                return res;
+        }
+
+        if (!match(TokenType.SEMICOLON, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected ';' after attribute declaration."
+            ));
+        res.advance();
+
+        return res.success(
+            AttrNode(name, val, isConstant, isPrivate, isStatic)
+                .tokSource(start, previous)
+        );
+    }
+
+    func prv parseMethod() {
+        const res = ParseResult();
+        const start = previous;
+
+        let isDefault = false;
+        let isPrivate = false;
+        let isStatic = false;
+
+        if (match(TokenType.KEYWORD, "def")) {
+            isDefault = true;
+            res.advance();
+        }
+
+        if (!isDefault && 
+                match(TokenType.KEYWORD, "prv")) {
+            isPrivate = true;
+            res.advance();
+        }
+
+        if (!isDefault && !isPrivate && 
+                match(TokenType.KEYWORD, "pub"))
+            res.advance();
+        
+        if (!isDefault && 
+                match(TokenType.KEYWORD, "static")) {
+            isStatic = true;
+            res.advance();
+        }
+
+        const name = res.register(getIdentifier());
+        if (res.hasError())
+            return res;
+
+        const fn = res.register(function(FuncType.METHOD));
+        if (res.hasError())
+            return res;
+        
+        return res.success(
+            MethodNode(name, fn, isPrivate, isStatic, isDefault)
+                .tokSource(start, previous)
+        );
+    }
+
+    func prv parseBuilder() {
+        const res = ParseResult();
+        const start = previous;
+        const fn = res.register(function(FuncType.BUILDER));
+        if (res.hasError())
+            return res;
+        fn.tokSource(start, previous);
+        return res.success(fn);
+    }
+
+    func prv classDeclaration() {
+        const res = ParseResult();
+        const start = previous;
+
+        const name = res.register(getIdentifier());
+        if (res.hasError())
+            return res;
+        
+        let superclass;
+        if (match(TokenType.LEFT_ARROW, null)) {
+            res.advance();
+            if (!match(TokenType.IDENTIFIER, null))
+                return res.failure(Error.InvalidSyntax(
+                    current.filename, current.src,
+                    current.idx, current.len,
+                    "Expected superclass name."
+                ));
+            
+            res.advance();
+            if (name == previous.text)
+                return res.failure(Error.InvalidSyntax(
+                    previous.filename, previous.src,
+                    previous.idx, previous.len,
+                    "Class cannot inherit from itself."
+                ));
+            
+            superclass = res.register(variable(false));
+            if (res.hasError())
+                return res;
+        }
+
+        if (!match(TokenType.LBRACE, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected '{' before class body."
+            ));
+        res.advance();
+
+        let builder;
+        const methods = npmap.map();
+        const fields = npmap.map();
+        while (current.tokenType != TokenType.EOF &&
+                current.tokenType != TokenType.RBRACE) {
+            if (match(TokenType.KEYWORD, "func")) {
+                res.advance();
+                const method = res.register(parseMethod());
+                if (res.hasError())
+                    return res;
+                
+                const success = npmap.emplace(
+                    methods,
+                    method.getName(), method
+                );
+                if (!success)
+                    return res.failure(Error.InvalidSyntax(
+                        method.filename, method.src,
+                        method.idx, method.len,
+                        "Method has already been declared on this class."
+                    ));
+            } else if (match(TokenType.KEYWORD, "build")) {
+                res.advance();
+                let newBuilder = res.register(parseBuilder());
+                if (res.hasError())
+                    return res;
+                
+                if (builder != null)
+                    return res.failure(Error.InvalidSyntax(
+                        newBuilder.filename, newBuilder.src,
+                        newBuilder.idx, newBuilder.len,
+                        "Class already has a defined constructor."
+                    ));
+                builder = newBuilder;
+            } else if (match(TokenType.KEYWORD, "let") || 
+                    match(TokenType.KEYWORD, "var") || 
+                    match(TokenType.KEYWORD, "const")) {
+                res.advance();
+                const attribute = res.register(parseAttribute());
+                if (res.hasError())
+                    return res;
+                
+                const success = npmap.emplace(
+                    fields,
+                    attribute.getName(), attribute
+                );
+                if (!success)
+                    return res.failure(Error.InvalidSyntax(
+                        attribute.filename, attribute.src,
+                        attribute.idx, attribute.len,
+                        "Attribute has already been declared on this class."
+                    ));
+            } else {
+                return res.failure(Error.InvalidSyntax(
+                    current.filename, current.src,
+                    current.idx, current.len,
+                    "Expected field, method, or constructor."
+                ));
+            }
+        }
+        if (!match(TokenType.RBRACE, null))
+            return res.failure(Error.ExpectedCharError(
+                current.filename, current.src,
+                current.idx, current.len,
+                "Expected '}' after class body."
+            ));
+        res.advance();
+
+        const clazz = ClassNode(
+            name, superclass, 
+            builder, methods, fields
+        ).tokSource(start, previous);
+        
+        return res.success(
+            declareVariable(name, clazz, true)
                 .tokSource(start, previous)
         );
     }
@@ -891,6 +1133,74 @@ class Parser {
         );
     }
 
+    func prv importFile(path) {
+        const res = ParseResult();
+
+        if (npmap.has(importedASTs, path)) {
+            const ast = npmap.get(importedASTs, path);
+            return res.success(ImportFileNode(path, ast));
+        }
+
+        const cwd = iofile.getCWD();
+
+        const fp = iofile.openFile(path, "rb");
+        iofile.setCWD(iofile.getFileDirectory(path));
+
+        const filename = formatPkg.getFilename(path);
+        const src = iofile.readFile(fp);
+        iofile.closeFile(fp);
+
+        const lexer = lexerPkg.Lexer(filename, src);
+        const hasError = !lexer.lex();
+        if (hasError)
+            return res.failure(lexer.getError());
+        
+        const parser = Parser(path, lexer.getTokens());
+        parser.inheritASTs(importedASTs);
+
+        const ast = res.register(parser.parse());
+        if (res.hasError())
+            return res;
+
+        iofile.setCWD(cwd);
+        npmap.emplace(importedASTs, path, ast);
+        return res.success(ImportFileNode(path, ast));
+    }
+
+    func prv importExpression() {
+        const res = ParseResult();
+        const start = previous;
+
+        if (match(TokenType.IDENTIFIER, null)) {
+            res.advance();
+            return res.success(
+                ImportNode(previous.text)
+                    .tokSource(start, previous)
+            );
+        }
+
+        if (match(TokenType.STRING, null)) {
+            res.advance();
+            const end = previous;
+
+            if (!iofile.fileExists(previous.text))
+                return res.failure(Error(
+                    previous.filename, previous.src,
+                    previous.idx, previous.len,
+                    "Invalid Path", "File to be imported cannot be located."
+                ));
+            
+            const path = iofile.getAbsPath(previous.text);
+            const node = res.register(importFile(path));
+            if (res.hasError())
+                return res;
+            node.tokSource(start, end);
+            return res.success(
+                node
+            );
+        }
+    }
+
     func prv keyword(canAssign) {
         const res = ParseResult();
         const tok = previous;
@@ -917,8 +1227,12 @@ class Parser {
                     .tokSource(previous, previous)
             );
         } else if (tok.text == "import") {
-            // TODO: Imports.
+            const node = res.register(importExpression());
+            if (res.hasError())
+                return res;
+            return res.success(node);
         }
+
         return res.failure(Error.InvalidSyntax(
             previous.filename, previous.src,
             previous.idx, previous.len,

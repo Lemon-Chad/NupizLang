@@ -31,6 +31,11 @@ class NodeType {
     const pub static IMPORT         =   27;
     const pub static THIS           =   28;
     const pub static SUPER          =   29;
+    const pub static ATTRIBUTE      =   30;
+    const pub static METHOD         =   31;
+    const pub static AND            =   32;
+    const pub static OR             =   33;
+    const pub static IMPORT_FILE    =   34;
 }
 
 class Node {

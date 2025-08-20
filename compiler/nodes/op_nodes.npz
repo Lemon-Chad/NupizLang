@@ -44,7 +44,7 @@ class UnaryNode <- Node {
     }
 
     func def string() {
-        return OpCode.toString(opCode) + std.asString(operand);
+        return OpCode.toString(opCode) + "(" + std.asString(operand) + ")";
     }
 }
 
@@ -72,7 +72,9 @@ class CallNode <- Node {
         let res = "Call(" + std.asString(operand) + ", [";
         for (let i = 0; i < argc; i += 1)
             res += std.asString(npvec.at(args, i)) + ", ";
-        return std.slice(res, 0, -3) + "])";
+        if (argc > 0)
+            res = std.slice(res, 0, -3);
+        return res + "])";
     }
 }
 
@@ -102,7 +104,9 @@ class InvokeNode <- Node {
         let res = "Invoke(" + std.asString(operand) + ", '" + name + "', [";
         for (let i = 0; i < argc; i += 1)
             res += std.asString(npvec.at(args, i)) + ", ";
-        return std.slice(res, 0, -3) + "])";
+        if (argc > 0)
+            res = std.slice(res, 0, -3);
+        return res + "])";
     }
 }
 
@@ -234,5 +238,39 @@ class OrNode <- Node {
     func def string() {
         return "Or(" + std.asString(left) + 
             ", " + std.asString(right) + ")";
+    }
+}
+
+class ImportNode <- Node {
+    let prv name;
+
+    build(oName) {
+        name = oName;
+
+        type = NodeType.IMPORT;
+    }
+
+    func def string() {
+        return "Import(" + name + ")";
+    }
+}
+
+class ImportFileNode <- Node {
+    let prv path;
+    let prv ast;
+
+    build(oPath, oAST) {
+        path = oPath;
+        ast = oAST;
+
+        type = NodeType.IMPORT_FILE;
+    }
+
+    func getChildren() {
+        return npvec.vec(ast);
+    }
+
+    func def string() {
+        return "Import('" + path + "')";
     }
 }

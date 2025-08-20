@@ -85,7 +85,14 @@ class ForNode <- Node {
     }
 
     func getChildren() {
-        return npvec.vec(initializer, condition, iterator, body);
+        const children = npvec.vec(body);
+        if (initializer != null)
+            npvec.append(children, initializer);
+        if (condition != null)
+            npvec.append(children, condition);
+        if (iterator != null)
+            npvec.append(children, iterator);
+        return children;
     }
 
     func def string() {

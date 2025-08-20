@@ -115,10 +115,13 @@ class Lexer {
     }
 
     func prv addToken(tokenType, text) {
+        addTokenLen(tokenType, text, std.length(text));
+    }
+
+    func prv addTokenLen(tokenType, text, len) {
         const tok = Token(tokenType, text);
-        const n = std.length(text);
         tok.setSource(src, filename);
-        tok.setPosition(idx - n, n, line, col - n);
+        tok.setPosition(idx - len, len, line, col - len);
         npvec.append(tokens, tok);
     }
 
@@ -197,7 +200,7 @@ class Lexer {
         }
         advance();
 
-        addToken(TokenType.STRING, string);
+        addTokenLen(TokenType.STRING, string, std.length(string) + 2);
 
         return true;
     }
@@ -207,12 +210,18 @@ class Lexer {
             advance();
     }
 
+    func prv skipComment() {
+        while (idx < len && current != "\n")
+            advance();
+        return true;
+    }
+
     func pub lex() {
         while (idx < len) {
             consumeWhitespace();
             if (idx >= len)
                 break;
-
+            
             if (isAlpha() || current == "_") {
                 lexIdentifier();
             } else if (isNumeric()) {
@@ -262,7 +271,9 @@ class Lexer {
                 else
                     addToken(TokenType.STAR, "*");
             } else if (match("/")) {
-                if (match("="))
+                if (match("/"))
+                    skipComment();
+                else if (match("="))
                     addToken(TokenType.SLASH_EQUAL, "/=");
                 else
                     addToken(TokenType.SLASH, "/");
@@ -338,5 +349,9 @@ class Lexer {
 
         // std.println("Error at line " + std.asString(line) + " col " + std.asString(col) + ": ");
         // std.println("\t-- " + std.asString(errorMessage));
+    }
+
+    func pub getError() {
+        return errorMessage;
     }
 }

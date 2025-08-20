@@ -220,6 +220,26 @@ static NativeResult getFullPathNative(VM* vm, int argc, Value* args) {
     return NATIVE_VAL(OBJ_VAL(str));
 }
 
+static NativeResult fileExistsNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 1))
+        return NATIVE_FAIL;
+    if (!IS_STRING(args[0])) {
+        runtimeError(vm, "Expected a file path as an argument.");
+        return NATIVE_FAIL;
+    }
+    return NATIVE_VAL(BOOL_VAL(fileExists(AS_CSTRING(args[0]))));
+}
+
+static NativeResult dirExistsNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 1))
+        return NATIVE_FAIL;
+    if (!IS_STRING(args[0])) {
+        runtimeError(vm, "Expected a file path as an argument.");
+        return NATIVE_FAIL;
+    }
+    return NATIVE_VAL(BOOL_VAL(fileExists(AS_CSTRING(args[0]))));
+}
+
 bool importFileLib(VM* vm, ObjString* lib) {
     LIBFUNC("openFile", openFileNative);
     LIBFUNC("closeFile", closeFileNative);
@@ -236,6 +256,9 @@ bool importFileLib(VM* vm, ObjString* lib) {
     LIBFUNC("setCWD", changeDirectoryNative);
     LIBFUNC("getCWD", getCurrentWorkingDirectoryNative);
     LIBFUNC("getAbsPath", getFullPathNative);
+
+    LIBFUNC("fileExists", fileExistsNative);
+    LIBFUNC("dirExists", dirExistsNative);
 
     return true;
 }

@@ -36,5 +36,7 @@ void changeDirectory(char* path);
 void changeDirectoryToFile(char* path);
 char* getCurrentWorkingDirectory();
 char* getFullPath(char* path);
+bool fileExists(char* path);
+bool dirExists(char* path);
 
 #endif

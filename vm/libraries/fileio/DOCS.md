@@ -16,6 +16,8 @@ Rudimentary high level file IO library for Nupiz.
 - [getAbsPath](#getabspath)
 - [getCWD](#getcwd)
 - [setCWD](#setcwd)
+- [fileExists](#fileexists)
+- [dirExists](#direxists)
 
 ## openFile
 
@@ -69,7 +71,7 @@ Takes in a file path and returns the path to the directory in which the file is 
 
 `getAbsPath(path)`
 
-Takes in a file path and returns the absolute path from the system root to the file location.
+Takes in a path and returns the absolute path from the system root to the file location.
 
 ## getCWD
 
@@ -81,4 +83,16 @@ Returns the program's current working directory.
 
 `setCWD(path)`
 
-Takes in a file path and sets the program's current working directory to the given path.
+Takes in a directory path and sets the program's current working directory to the given path.
+
+## fileExists
+
+`fileExists(path)`
+
+Takes in a file path and returns whether or not the file exists.
+
+## dirExists
+
+`dirExists(path)`
+
+Takes in a directory path and returns wheter or not the directory exists.

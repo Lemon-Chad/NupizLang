@@ -1,7 +1,8 @@
+#include <dirent.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 
 #include "../vm/object.h"
 #include "memory.h"
@@ -419,4 +420,17 @@ char* getFullPath(char* path) {
     printf("%s: %s/%s\n", strerror(errno), getCurrentWorkingDirectory(), path);
     free(full);
     return NULL;
+}
+
+bool fileExists(char* path) {
+    return access(path, F_OK) == 0;
+}
+
+bool dirExists(char* path) {
+    DIR* dir = opendir(path);
+    if (dir) {
+        closedir(dir);
+        return true;
+    }
+    return false;
 }

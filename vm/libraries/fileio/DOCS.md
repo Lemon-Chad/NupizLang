@@ -12,6 +12,10 @@ Rudimentary high level file IO library for Nupiz.
 - [writeFile](#writefile)
 - [writeFileAt](#writefileat)
 - [writeFileByte](#writefilebyte)
+- [getFileDirectory](#getfiledirectory)
+- [getAbsPath](#getabspath)
+- [getCWD](#getcwd)
+- [setCWD](#setcwd)
 
 ## openFile
 
@@ -54,3 +58,27 @@ Writes the given object as a string to the given file at the given index and ret
 `writeFileByte(file, byte)`
 
 Writes the given number to the given file as a byte.
+
+## getFileDirectory
+
+`getFileDirectory(path)`
+
+Takes in a file path and returns the path to the directory in which the file is stored.
+
+## getAbsPath
+
+`getAbsPath(path)`
+
+Takes in a file path and returns the absolute path from the system root to the file location.
+
+## getCWD
+
+`getCWD()`
+
+Returns the program's current working directory.
+
+## setCWD
+
+`setCWD(path)`
+
+Takes in a file path and sets the program's current working directory to the given path.

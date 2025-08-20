@@ -1,5 +1,7 @@
+#include <string.h>
 
 #include "filelib.h"
+
 
 typedef struct {
     FILE* fp;
@@ -175,6 +177,49 @@ static NativeResult writeFileByteNative(VM* vm, int argc, Value* args) {
     return NATIVE_VAL(NUMBER_VAL(written));
 }
 
+static NativeResult getDirectoryNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 1))
+        return NATIVE_FAIL;
+    if (!IS_STRING(args[0])) {
+        runtimeError(vm, "Expected a file path as an argument.");
+        return NATIVE_FAIL;
+    }
+    char* dir = getDirectory(AS_CSTRING(args[0]));
+    ObjString* str = takeString(vm, dir, strlen(dir));
+    return NATIVE_VAL(OBJ_VAL(str));
+}
+
+static NativeResult changeDirectoryNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 1))
+        return NATIVE_FAIL;
+    if (!IS_STRING(args[0])) {
+        runtimeError(vm, "Expected a file path as an argument.");
+        return NATIVE_FAIL;
+    }
+    changeDirectory(AS_CSTRING(args[0]));
+    return NATIVE_OK;
+}
+
+static NativeResult getCurrentWorkingDirectoryNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 0))
+        return NATIVE_FAIL;
+    char* cwd = getCurrentWorkingDirectory();
+    ObjString* str = takeString(vm, cwd, strlen(cwd));
+    return NATIVE_VAL(OBJ_VAL(str));
+}
+
+static NativeResult getFullPathNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 1))
+        return NATIVE_FAIL;
+    if (!IS_STRING(args[0])) {
+        runtimeError(vm, "Expected a file path as an argument.");
+        return NATIVE_FAIL;
+    }
+    char* path = getFullPath(AS_CSTRING(args[0]));
+    ObjString* str = takeString(vm, path, strlen(path));
+    return NATIVE_VAL(OBJ_VAL(str));
+}
+
 bool importFileLib(VM* vm, ObjString* lib) {
     LIBFUNC("openFile", openFileNative);
     LIBFUNC("closeFile", closeFileNative);
@@ -186,6 +231,11 @@ bool importFileLib(VM* vm, ObjString* lib) {
     LIBFUNC("writeFile", writeFileNative);
     LIBFUNC("writeFileAt", writeFileAtNative);
     LIBFUNC("writeFileByte", writeFileByteNative);
+    
+    LIBFUNC("getFileDirectory", getDirectoryNative);
+    LIBFUNC("setCWD", changeDirectoryNative);
+    LIBFUNC("getCWD", getCurrentWorkingDirectoryNative);
+    LIBFUNC("getAbsPath", getFullPathNative);
 
     return true;
 }

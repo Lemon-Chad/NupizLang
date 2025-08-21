@@ -1,0 +1,58 @@
+import npvec;
+
+unpack import "./op_codes.npz";
+
+class Chunk {
+    let prv constants;
+
+    let prv bytes;
+    let prv lines;
+    let prv linesRun;
+
+    build() {
+        bytes = npvec.vec();
+        lines = npvec.vec();
+        linesRun = npvec.vec();
+        constants = npvec.vec();
+    }
+
+    func pub writeByte(b, line) {
+        if (npvec.size(lines) > 0 && npvec.at(lines, -1) == line) {
+            npvec.set(linesRun, -1, npvec.at(linesRun, -1) + 1);
+        } else {
+            npvec.append(lines, line);
+            npvec.append(linesRun, 1);
+        }
+
+        npvec.append(bytes, b);
+    }
+
+    func pub writeBytes(b1, b2, line) {
+        writeByte(b1, line);
+        writeByte(b2, line);
+    }
+
+    func pub addConstant(val) {
+        let idx = npvec.find(constants, val);
+        if (idx != -1)
+            return idx;
+        
+        npvec.append(constants, val);
+        return npvec.size(constants) - 1;
+    }
+
+    func pub writeConstant(val, line) {
+        const idx = addConstant(val);
+
+        if (idx >= 256) {
+            writeByte(OpCode.CONSTANT_LONG, line);
+        } else {
+            writeByte(OpCode.CONSTANT, line);
+        }
+        writeByte(idx, line);
+    }
+}
+
+class Compiler {
+    
+}

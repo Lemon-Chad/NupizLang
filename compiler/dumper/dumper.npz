@@ -1,0 +1,33 @@
+import npvec;
+import std;
+
+class DumpCode {
+    const pub static DUMP_NULL      =   0;
+    const pub static DUMP_NUMBER    =   1;
+    const pub static DUMP_BOOL      =   2;
+    const pub static DUMP_STRING    =   3;
+    const pub static DUMP_FUNC      =   4;
+    const pub static DUMP_CHUNK     =   5;
+    const pub static DUMP_NAMESPACE =   6;
+}
+
+class DumpBytes {
+    let prv bytes;
+
+    build() {
+        bytes = npvec.vec();
+    }
+
+    func prv writeByte(b) {
+        npvec.append(bytes, b);
+    }
+
+    func prv writeBytes(bs) {
+        for (let i = 0; i < npvec.size(bs); i += 1)
+            writeByte(npvec.at(bs, i));
+    }
+
+    func prv getBytes() {
+        return bytes;
+    }
+}

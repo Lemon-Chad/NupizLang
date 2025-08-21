@@ -1015,16 +1015,16 @@ static void importFile(Parser* parser) {
         return;
     }
 
-    VM temp;
+    VM* temp = malloc(sizeof(VM));
 
-    initVM(&temp, filename->chars);
-    tableAddAll(&temp, &parser->vm->importedFiles, &temp.importedFiles);
-    ObjFunction* func = compile(&temp, filename->chars, src);
+    initVM(temp, filename->chars);
+    tableAddAll(temp, &parser->vm->importedFiles, &temp->importedFiles);
+    ObjFunction* func = compile(temp, filename->chars, src);
     push(parser->vm, OBJ_VAL(func));
-    tableAddAll(parser->vm, &temp.importedFiles, &parser->vm->importedFiles);
+    tableAddAll(parser->vm, &temp->importedFiles, &parser->vm->importedFiles);
     
-    decoupleVM(&temp);
-    takeOwnership(parser->vm, temp.objects);
+    decoupleVM(temp);
+    takeOwnership(parser->vm, temp->objects);
 
     changeDirectory(cwd);
     free(cwd);

@@ -1,5 +1,6 @@
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "../util/common.h"
@@ -1059,21 +1060,21 @@ InterpretResult run(VM* vm) {
 
                 ObjFunction* func = AS_FUNCTION(peek(vm, 0));
 
-                VM temp;
-                initVM(&temp, filename->chars);
+                VM* temp = malloc(sizeof(VM));
+                initVM(temp, filename->chars);
 
-                tableSet(vm, &vm->importedFiles, filename, OBJ_VAL(temp.nspace));
-                tableAddAll(&temp, &vm->importedFiles, &temp.importedFiles);
+                tableSet(vm, &vm->importedFiles, filename, OBJ_VAL(temp->nspace));
+                tableAddAll(temp, &vm->importedFiles, &temp->importedFiles);
 
-                runFunc(&temp, func);
+                runFunc(temp, func);
 
-                ObjNamespace* nspace = temp.nspace;
+                ObjNamespace* nspace = temp->nspace;
                 vm->stackTop[-2] = OBJ_VAL(nspace);
                 tableSet(vm, &vm->importedFiles, filename, OBJ_VAL(nspace));
-                tableAddAll(vm, &temp.importedFiles, &vm->importedFiles);
+                tableAddAll(vm, &temp->importedFiles, &vm->importedFiles);
                 
-                decoupleVM(&temp);
-                takeOwnership(vm, temp.objects);
+                decoupleVM(temp);
+                takeOwnership(vm, temp->objects);
                 
                 pop(vm);
 

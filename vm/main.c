@@ -153,9 +153,9 @@ static void runFile(VM* vm, char* path) {
 }
 
 int main(int argc, const char* argv[]) {
-    VM vm;
-    initVM(&vm, "main");
-    vm.isMain = true;
+    VM* vm = malloc(sizeof(VM));
+    initVM(vm, "main");
+    vm->isMain = true;
 
     int flags = 0;
     char* compileTarget = "";
@@ -170,10 +170,16 @@ int main(int argc, const char* argv[]) {
             exit(2);
         }
 
-        vm.argv = argv + 3;
-        vm.argc = argc - 3;
+
+        if (!fileExists(argv[2])) {
+            fprintf(stderr, "Could not locate file.\n");
+            exit(2);
+        }
+
+        vm->argv = argv + 3;
+        vm->argc = argc - 3;
         changeDirectoryToFile(argv[2]);
-        runFile(&vm, argv[2]);
+        runFile(vm, argv[2]);
         return 0;
     }
 
@@ -246,14 +252,14 @@ int main(int argc, const char* argv[]) {
         }
 
         changeDirectoryToFile(compileTarget);
-        compileFile(&vm, compileTarget, outputTarget);
+        compileFile(vm, compileTarget, outputTarget);
     }
 
     if (HAS_FLAG(flags, FLAG_RUN)) {
         changeDirectoryToFile(runTarget);
-        runFile(&vm, runTarget);
+        runFile(vm, runTarget);
     }
     
-    freeVM(&vm);
+    freeVM(vm);
     return 0;
 }

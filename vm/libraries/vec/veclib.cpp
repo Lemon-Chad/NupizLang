@@ -175,11 +175,39 @@ static NativeResult insertNative(VM* vm, int argc, Value* args) {
     return NATIVE_OK;
 }
 
+static NativeResult setNative(VM* vm, int argc, Value* args) {
+    if (!expectArgs(vm, argc, 3)) 
+        return NATIVE_FAIL;
+    if (!IS_NPVECTOR(args[0])) {
+        runtimeError(vm, "Expected vector as first argument.");
+        return NATIVE_FAIL;
+    }
+    if (!IS_NUMBER(args[2])) {
+        runtimeError(vm, "Expected a number index as a second argument.");
+        return NATIVE_FAIL;
+    }
+
+    NPVector* npvector = AS_NPVECTOR(args[0]);
+    size_t idx = (size_t) AS_NUMBER(args[2]);
+    size_t len = npvector->vec->size();
+    if (idx < 0)
+        idx += len;
+    if (idx < 0 || idx >= len) {
+        runtimeError(vm, "Index out of range.");
+        return NATIVE_FAIL;
+    }
+
+    (*npvector->vec)[idx] = args[1];
+    
+    return NATIVE_OK;
+}
+
 bool importVecLib(VM* vm, ObjString* lib) {
     LIBFUNC("vec", vecNative);
     LIBFUNC("vecFrom", vecFromNative);
     LIBFUNC("append", appendNative);
     LIBFUNC("insert", insertNative);
+    LIBFUNC("set", setNative);
     LIBFUNC("remove", removeNative);
     LIBFUNC("pop", popNative);
     LIBFUNC("size", sizeNative);

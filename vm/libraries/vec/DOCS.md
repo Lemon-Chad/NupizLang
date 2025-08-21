@@ -57,6 +57,12 @@ Appends the given element to the end of the given vector.
 
 Inserts the given element at the index provided in the vector, shifting all elements including the element already at the index to the right.
 
+## set
+
+`set(vector, ele, index)`
+
+Sets the element at the index provided in the vector to the new given element.
+
 ## remove
 
 `remove(vector, index)`

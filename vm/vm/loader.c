@@ -70,11 +70,17 @@ static ObjString* readString(BytecodeLoader* loader);
 static ObjNamespace* readNamespace(BytecodeLoader* loader);
 
 static bool readBool(BytecodeLoader* loader) {
+    #ifdef DEBUG_PRINT_LOADER
+        printf("-- reading bool\n");
+    #endif
     consume(loader, DUMP_BOOL);
     return advance(loader) == 1;
 }
 
 static double readNumber(BytecodeLoader* loader) {
+    #ifdef DEBUG_PRINT_LOADER
+        printf("-- reading number\n");
+    #endif
     consume(loader, DUMP_NUMBER);
     uint8_t byte_array[sizeof(double)];
     double num = 0;
@@ -105,7 +111,13 @@ static Value readValue(BytecodeLoader* loader) {
 }
 
 static ValueArray readValueArray(BytecodeLoader* loader) {
+    #ifdef DEBUG_PRINT_LOADER
+        printf("-- reading value array\n");
+    #endif
     int count = readInt(loader);
+    #ifdef DEBUG_PRINT_LOADER
+        printf("-- size %d\n", count);
+    #endif
 
     ValueArray array;
     initValueArray(&array);
@@ -223,6 +235,9 @@ static ObjFunction* readFunction(BytecodeLoader* loader) {
 }
 
 static ObjNamespace* readNamespace(BytecodeLoader* loader) {
+    #ifdef DEBUG_PRINT_LOADER
+        printf("-- reading namespace\n");
+    #endif
     consume(loader, DUMP_NAMESPACE);
 
     ObjString* name = readString(loader);
@@ -241,6 +256,9 @@ static ObjNamespace* readNamespace(BytecodeLoader* loader) {
 }
 
 Table readTable(BytecodeLoader* loader) {
+    #ifdef DEBUG_PRINT_LOADER
+        printf("-- reading table\n");
+    #endif
     Table tb;
     initTable(&tb);
 

@@ -158,6 +158,18 @@ static NativeResult mainNative(VM* vm, int argc, Value* args) {
 static NativeResult asByteNative(VM* vm, int argc, Value* args) {
     if (!expectArgs(vm, argc, 1))
         return NATIVE_FAIL;
+    if (IS_NUMBER(args[0])) {
+        uint8_t byte_array[sizeof(double)];
+        double num = AS_NUMBER(args[0]);
+        memcpy(byte_array, &num, sizeof(double));
+
+        ObjList* list = newList(vm);
+        push(vm, OBJ_VAL(list));
+        for (int i = 0; i < sizeof(double); i++)
+            writeValueArray(vm, &list->list, NUMBER_VAL(byte_array[i]));
+        pop(vm);
+        return NATIVE_VAL(OBJ_VAL(list));
+    }
     if (!IS_STRING(args[0]) || AS_STRING(args[0])->length != 1) {
         runtimeError(vm, "Expected character as argument.");
         return NATIVE_FAIL;

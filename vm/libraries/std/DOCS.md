@@ -72,9 +72,11 @@ Returns the current time as a UNIX timestamp.
 
 ## asByte
 
-`asByte(char)`
+`asByte(obj)`
 
-Takes a character and returns it as a byte.
+Returns the given object in byte form.
+    - `character`: Returns the character as a byte.
+    - `double`: Returns the number as a list of bytes.
 
 ## cmdargs
 

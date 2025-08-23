@@ -26,6 +26,8 @@
 //#define DEBUG_PRINT_DUMPER
 //#define DEBUG_PRINT_LOADER
 
+//#define DEBUG_PRINT_POP
+
 //#define DEBUG_PRINT_CODE
 //#define DEBUG_TRACE_EXECUTION
 

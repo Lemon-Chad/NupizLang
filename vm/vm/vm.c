@@ -736,6 +736,10 @@ InterpretResult run(VM* vm) {
             }
 
             case OP_POP:
+                #ifdef DEBUG_PRINT_POP
+                    printValue(peek(vm, 0));
+                    printf("\n");
+                #endif
                 pop(vm);
                 break;
             

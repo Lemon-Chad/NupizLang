@@ -168,7 +168,32 @@ static NativeResult writeFileByteNative(VM* vm, int argc, Value* args) {
         return NATIVE_FAIL;
     }
 
-    uint8_t byte = (uint8_t) AS_NUMBER(args[1]);
+    double num = AS_NUMBER(args[1]);
+    if (num > UINT8_MAX) {
+        if (((int) num) == num) {
+            int nt = (int) num;
+            uint8_t byte_array[4];
+            byte_array[0] = nt & 0xFF;
+            byte_array[1] = (nt >> 8) & 0xFF;
+            byte_array[2] = (nt >> 16) & 0xFF;
+            byte_array[3] = (nt >> 24) & 0xFF;
+
+            fseek(fp, 0, SEEK_END);
+            size_t written = fwrite(&byte_array, sizeof(uint8_t), 4, fp);
+            rewind(fp);
+            return NATIVE_VAL(NUMBER_VAL(written));
+        }
+
+        uint8_t byte_array[sizeof(double)];
+        memcpy(byte_array, &num, sizeof(double));
+
+        fseek(fp, 0, SEEK_END);
+        size_t written = fwrite(&byte_array, sizeof(uint8_t), 4, fp);
+        rewind(fp);
+        return NATIVE_VAL(NUMBER_VAL(written));
+    }
+
+    uint8_t byte = (uint8_t) num;
 
     fseek(fp, 0, SEEK_END);
     size_t written = fwrite(&byte, sizeof(uint8_t), 1, fp);

@@ -1,14 +1,18 @@
+import iofile;
 import npvec;
 import std;
+import math;
+
+unpack import "../compiler/value.npz";
 
 class DumpCode {
-    const pub static DUMP_NULL      =   0;
-    const pub static DUMP_NUMBER    =   1;
-    const pub static DUMP_BOOL      =   2;
-    const pub static DUMP_STRING    =   3;
-    const pub static DUMP_FUNC      =   4;
-    const pub static DUMP_CHUNK     =   5;
-    const pub static DUMP_NAMESPACE =   6;
+    const pub static NULL      =   0;
+    const pub static NUMBER    =   1;
+    const pub static BOOL      =   2;
+    const pub static STRING    =   3;
+    const pub static FUNCTION  =   4;
+    const pub static CHUNK     =   5;
+    const pub static NAMESPACE =   6;
 }
 
 class DumpBytes {
@@ -22,12 +26,95 @@ class DumpBytes {
         npvec.append(bytes, b);
     }
 
+    func prv writeInt(num) {
+        const i = math.floor(num);
+        npvec.append(bytes, math.mod(i, 256));
+        npvec.append(bytes, math.mod(math.floor(i / 256), 256));
+        npvec.append(bytes, math.mod(math.floor(i / 65536), 256));
+        npvec.append(bytes, math.mod(math.floor(i / 16777216), 256));
+    }
+
     func prv writeBytes(bs) {
-        for (let i = 0; i < npvec.size(bs); i += 1)
+        const n = npvec.size(bs);
+        for (let i = 0; i < n; i += 1)
             writeByte(npvec.at(bs, i));
+    }
+
+    func prv dumpChunk(chunk) {
+        writeByte(DumpCode.CHUNK);
+
+        const linesN = npvec.size(chunk.lines);
+        writeInt(linesN);
+        for (let i = 0; i < linesN; i += 1) {
+            writeInt(npvec.at(chunk.lines, i));
+            writeInt(npvec.at(chunk.linesRun, i));
+        }
+
+        dumpValueArray(chunk.constants);
+
+        const codeN = npvec.size(chunk.bytes);
+        writeInt(codeN);
+        writeBytes(chunk.bytes);
+    }
+
+    func pub dumpFunction(fn) {
+        writeByte(DumpCode.FUNCTION);
+        writeByte(fn.arity);
+
+        if (fn.name == null)
+            writeByte(DumpCode.NULL);
+        else
+            dumpVal(fn.name);
+        
+        writeByte(fn.upvalueCount);
+        dumpChunk(fn.chunk);
+    }
+
+    func prv dumpValueArray(vec) {
+        const n = npvec.size(vec);
+        writeInt(n);
+        for (let i = 0; i < n; i += 1)
+            dumpVal(npvec.at(vec, i));
+    }
+
+    func prv dumpVal(val) {
+        if (val.type == ValueType.BOOL) {
+            writeByte(DumpCode.BOOL);
+            if (val.val)
+                writeByte(1);
+            else
+                writeByte(0);
+        } else if (val.type == ValueType.NUMBER) {
+            writeByte(DumpCode.NUMBER);
+            writeBytes(npvec.vecFrom(std.asByte(val.val)));
+        } else if (val.type == ValueType.NULL) {
+            writeByte(DumpCode.NULL);
+        } else if (val.type == ValueType.STRING) {
+            writeByte(DumpCode.STRING);
+
+            const n = std.length(val.val);
+            writeInt(n);
+            for (let i = 0; i < n; i += 1)
+                writeByte(std.asByte(val.val[i]));
+        } else if (val.type == ValueType.UPVALUE) {
+            dumpVal(val.val);
+        } else if (val.type == ValueType.FUNCTION) {
+            dumpFunction(val.val);
+        } else {
+            std.println("Unhandled type '" + std.asString(val.type) + "'.");
+        }
     }
 
     func prv getBytes() {
         return bytes;
+    }
+
+    func pub writeToFile(filename) {
+        const fp = iofile.openFile(filename, "w+");
+        for (let i = 0; i < npvec.size(bytes); i += 1) {
+            iofile.writeFileByte(fp, npvec.at(bytes, i));
+        }
+        iofile.closeFile(fp);
+        return true;
     }
 }

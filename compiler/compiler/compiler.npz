@@ -1,13 +1,34 @@
 import npvec;
+import std;
 
 unpack import "./op_codes.npz";
+unpack import "./value.npz";
+
+unpack import "../nodes/func_nodes.npz";
+
+class Local {
+    let pub name;
+    let pub depth;
+    let pub loopDepth;
+    let pub fixed;
+    let pub isCaptured;
+
+    build(name, depth) {
+        this.name = name;
+        this.depth = depth;
+
+        loopDepth = 0;
+        fixed = false;
+        isCaptured = false;
+    }
+}
 
 class Chunk {
-    let prv constants;
+    let pub constants;
 
-    let prv bytes;
-    let prv lines;
-    let prv linesRun;
+    let pub bytes;
+    let pub lines;
+    let pub linesRun;
 
     build() {
         bytes = npvec.vec();
@@ -18,7 +39,7 @@ class Chunk {
 
     func pub writeByte(b, line) {
         if (npvec.size(lines) > 0 && npvec.at(lines, -1) == line) {
-            npvec.set(linesRun, -1, npvec.at(linesRun, -1) + 1);
+            npvec.set(linesRun, npvec.at(linesRun, -1) + 1, -1);
         } else {
             npvec.append(lines, line);
             npvec.append(linesRun, 1);
@@ -54,5 +75,127 @@ class Chunk {
 }
 
 class Compiler {
-    
+    let prv enclosing;
+
+    let prv locals;
+    let prv localCount;
+    let prv scopeDepth;
+
+    let prv loopDepth;
+    let prv breakPatches;
+
+    let prv function;
+    let prv type;
+
+    let prv ast;
+
+    let prv lastLine;
+
+    build(name, oType) {
+        enclosing = null;
+
+        locals = npvec.vec();
+        localCount = 1;
+        scopeDepth = 0;
+
+        loopDepth = 0;
+        breakPatches = npvec.vec();
+
+        function = Function(Value.String(name));
+        type = oType;
+
+        if (type != FuncType.FUNCTION) {
+            npvec.append(locals, Local("this", 0));
+        } else {
+            npvec.append(locals, Local("", 0));
+        }
+
+        ast = null;
+    }
+
+    func prv emitByte(b, line) {
+        if (line == -1)
+            line = lastLine;
+        else
+            lastLine = line;
+
+        function.chunk.writeByte(b, line);
+    }
+
+    func prv emitBytes(b1, b2, line) {
+        emitByte(b1, line);
+        emitByte(b2, line);
+    }
+
+    func prv emitReturn(line) {
+        if (type == FuncType.BUILDER) {
+            emitBytes(OpCode.GET_LOCAL, 0, line);
+        } else {
+            emitByte(OpCode.NULL, line);
+        }
+
+        emitByte(OpCode.RETURN, line);
+    }
+
+    func prv emitConstant(val, line) {
+        function.chunk.writeConstant(val, line);
+    }
+
+    func pub compile(tree) {
+        ast = tree;
+        lastLine = 1;
+
+        compileNode(ast);
+    }
+
+    func prv beginScope() {
+        scopeDepth += 1;
+    }
+
+    func prv endScope() {
+        scopeDepth -= 1;
+
+        let popped = 0;
+        while (localCount > 0 && npvec.at(locals, -1).depth > scopeDepth) {
+            if (npvec.at(locals, -1).isCaptured) {
+                emitByte(OpCode.CLOSE_UPVALUE, -1);
+            } else {
+                emitByte(OpCode.POP, -1);
+            }
+
+            localCount -= 1;
+        }
+    }
+
+    func prv compileNode(node) {
+        const nodeType = node.getType();
+        if (nodeType == NodeType.BODY) {
+            beginScope();
+            
+            const statements = node.getChildren();
+            for (let i = 0; i < npvec.size(statements); i += 1) {
+                compileNode(npvec.at(statements, i));
+                emitByte(OpCode.POP, -1);
+            }
+
+            endScope();
+        } else if (nodeType == NodeType.NUMBER) {
+            emitConstant(Value.Number(node.getValue()), node.getLine());
+        } else if (nodeType == NodeType.BINARY) {
+            compileNode(node.getLeft());
+            compileNode(node.getRight());
+            emitByte(node.getOpcode(), node.getLine());
+        } else if (nodeType == NodeType.UNARY) {
+            compileNode(node.getOperand());
+            emitByte(node.getOpcode(), node.getLine());
+        } else {
+            std.println("Unsupported node type '" + std.asString(nodeType) + "'.");
+        }
+    }
+
+    func pub endCompiler() {
+        emitReturn(ast.getEndLine());
+        return function;
+    }
+
 }

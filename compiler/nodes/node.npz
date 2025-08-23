@@ -1,5 +1,7 @@
 import npvec;
 
+const formatPkg = import "../util/formatting.npz";
+
 class NodeType {
     const pub static NUMBER         =    0;
     const pub static BOOLEAN        =    1;
@@ -67,6 +69,14 @@ class Node {
 
     func pub getLen() {
         return len;
+    }
+
+    func pub getLine() {
+        return formatPkg.idxToLine(src, idx);
+    }
+
+    func pub getEndLine() {
+        return formatPkg.idxToLine(src, idx + len);
     }
 
     func pub setSource(filename, src, idx, len) {

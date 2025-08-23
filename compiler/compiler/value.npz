@@ -1,0 +1,56 @@
+const compilerPkg = import "./compiler.npz";
+
+class ValueType {
+    const pub static NULL       =   0;
+    const pub static NUMBER     =   1;
+    const pub static BOOL       =   2;
+    const pub static STRING     =   3;
+    const pub static FUNCTION   =   4;
+    const pub static UPVALUE    =   5;
+}
+
+class Value {
+    let pub val;
+    let pub type;
+
+    build(val, type) {
+        this.val = val;
+        this.type = type;
+    }
+
+    func pub static Null() {
+        return Value(null, ValueType.NULL);
+    }
+
+    func pub static Number(val) {
+        return Value(val, ValueType.NUMBER);
+    }
+
+    func pub static String(val) {
+        return Value(val, ValueType.STRING);
+    }
+
+    func pub static Bool(val) {
+        return Value(val, ValueType.BOOL);
+    }
+
+    func def eq(other) {
+        return other.type == this.type && other.val == this.val;
+    }
+}
+
+class Function {
+    let pub arity;
+    let pub upvalueCount;
+    let pub chunk;
+    let pub name;
+
+    build(name) {
+        this.name = name;
+        chunk = compilerPkg.Chunk();
+
+        arity = 0;
+        upvalueCount = 0;
+    }
+}
+

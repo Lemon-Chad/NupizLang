@@ -21,6 +21,18 @@ class BinaryNode <- Node {
         return npvec.vec(left, right);
     }
 
+    func pub getLeft() {
+        return left;
+    }
+
+    func pub getRight() {
+        return right;
+    }
+
+    func pub getOpcode() {
+        return opCode;
+    }
+
     func def string() {
         return std.asString(left) + " " +
             OpCode.toString(opCode) + " " +
@@ -41,6 +53,14 @@ class UnaryNode <- Node {
 
     func getChildren() {
         return npvec.vec(left, right);
+    }
+
+    func pub getOperand() {
+        return operand;
+    }
+    
+    func pub getOpcode() {
+        return opCode;
     }
 
     func def string() {

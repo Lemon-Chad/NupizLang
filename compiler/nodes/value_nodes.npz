@@ -2,9 +2,19 @@ import std;
 import npvec;
 unpack import "./node.npz";
 
-class BooleanNode <- Node {
+class ValueNode <- Node {
     let prv value;
 
+    build(val) {
+        value = val;
+    }
+
+    func pub getValue() {
+        return value;
+    }
+}
+
+class BooleanNode <- ValueNode {
     build(val) {
         value = val;
         type = NodeType.BOOLEAN;
@@ -15,9 +25,7 @@ class BooleanNode <- Node {
     }
 }
 
-class NumberNode <- Node {
-    let prv value;
-
+class NumberNode <- ValueNode {
     build(val) {
         value = val;
         type = NodeType.NUMBER;
@@ -38,9 +46,7 @@ class NullNode <- Node {
     }
 }
 
-class StringNode <- Node {
-    let prv value;
-
+class StringNode <- ValueNode {
     build(val) {
         value = val;
         type = NodeType.STRING;
@@ -51,9 +57,7 @@ class StringNode <- Node {
     }
 }
 
-class ListNode <- Node {
-    let prv value;
-
+class ListNode <- ValueNode {
     build(val) {
         value = val;
         type = NodeType.LIST;

@@ -3,6 +3,8 @@ import iofile;
 
 const lexerPkg = import "./lexer/lexer.npz";
 const parserPkg = import "./parser/parser.npz";
+const compilerPkg = import "./compiler/compiler.npz";
+const dumperPkg = import "./dumper/dumper.npz";
 const formatPkg = import "./util/formatting.npz";
 const resPkg = import "./parser/result.npz";
 
@@ -31,7 +33,7 @@ func main(args) {
         return;
     }
 
-    lexer.printTokens();
+    std.println("-- Lexed.");
 
     const parser = parserPkg.Parser(absPath, lexer.getTokens());
     const res = parser.parse();
@@ -40,8 +42,19 @@ func main(args) {
         return;
     }
 
-    std.println("out: ");
-    std.println(std.asString(res.val));
+    std.println("-- Parsed.");
+
+    const compiler = compilerPkg.Compiler(absPath, compilerPkg.FuncType.SCRIPT);
+    compiler.compile(res.val);
+    const function = compiler.endCompiler();
+
+    std.println("-- Compiled.");
+
+    const dumper = dumperPkg.DumpBytes();
+    dumper.dumpFunction(function);
+    dumper.writeToFile(absPath + ".nux");
+
+    std.println("-- Dumped @ '" + absPath + ".nux'.");
 }
 
 std.main(main);

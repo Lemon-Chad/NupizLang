@@ -6,6 +6,7 @@ class FuncType {
     const pub static FUNCTION   =   0;
     const pub static METHOD     =   1;
     const pub static BUILDER    =   2;
+    const pub static SCRIPT     =   3;
 }
 
 class BodyNode <- Node {

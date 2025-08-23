@@ -505,18 +505,16 @@ static void funDeclaration(Parser* parser) {
 static void endScope(Parser* parser) {
     parser->compiler->scopeDepth--;
 
-    uint8_t n = 0;
     while (parser->compiler->localCount > 0 && 
             parser->compiler->locals[parser->compiler->localCount - 1].depth > 
             parser->compiler->scopeDepth) {
         if (parser->compiler->locals[parser->compiler->localCount - 1].isCaptured) {
             emitByte(parser, OP_CLOSE_UPVALUE);
         } else {
-            n++;
+            emitByte(parser, OP_POP);
         }
         parser->compiler->localCount--;
     }
-    emitBytes(parser, OP_POP_N, n);
 }
 
 static void expressionStatement(Parser* parser) {

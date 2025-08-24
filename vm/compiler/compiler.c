@@ -675,7 +675,6 @@ static void namedVariable(Parser* parser, Token tok, bool canAssign) {
         return;
     }
 
-
     if (setOp == OP_SET_LOCAL && parser->compiler->locals[arg].fixed) {
         error(parser, "Variable is constant and cannot be modified.");
         return;

@@ -531,6 +531,10 @@ InterpretResult run(VM* vm) {
             break; \
         } while(false)
 
+    #ifdef DEBUG_PRINT_CODE
+        disassembleChunk(&frame->closure->function->chunk, frame->closure->function->name == NULL ? "<script>" : frame->closure->function->name->chars);
+    #endif
+
     for (;;) {
         #ifdef DEBUG_TRACE_EXECUTION
             printf("          ");

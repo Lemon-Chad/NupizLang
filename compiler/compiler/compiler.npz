@@ -1,3 +1,4 @@
+import math;
 import npvec;
 import std;
 
@@ -27,11 +28,15 @@ class Chunk {
     let pub constants;
 
     let pub bytes;
+    let pub count;
+
     let pub lines;
     let pub linesRun;
 
     build() {
         bytes = npvec.vec();
+        count = 0;
+
         lines = npvec.vec();
         linesRun = npvec.vec();
         constants = npvec.vec();
@@ -46,6 +51,7 @@ class Chunk {
         }
 
         npvec.append(bytes, b);
+        count += 1;
     }
 
     func pub writeBytes(b1, b2, line) {
@@ -75,7 +81,7 @@ class Chunk {
 }
 
 class Compiler {
-    let prv enclosing;
+    let pub enclosing;
 
     let prv locals;
     let prv localCount;
@@ -84,7 +90,7 @@ class Compiler {
     let prv loopDepth;
     let prv breakPatches;
 
-    let prv function;
+    let pub function;
     let prv type;
 
     let prv ast;
@@ -141,6 +147,26 @@ class Compiler {
         function.chunk.writeConstant(val, line);
     }
 
+    func prv emitJump(op, line) {
+        emitByte(op, line);
+        emitBytes(0, 0, line);
+        return function.chunk.count - 2;
+    }
+
+    func prv patchJump(idx) {
+        const jump = function.chunk.count - idx - 2;
+        npvec.set(
+            function.chunk.bytes, 
+            math.mod(math.floor(jump / 256), 256),
+            idx
+        );
+        npvec.set(
+            function.chunk.bytes, 
+            math.mod(jump, 256),
+            idx + 1
+        );
+    }
+
     func pub compile(tree) {
         ast = tree;
         lastLine = 1;
@@ -148,11 +174,11 @@ class Compiler {
         compileNode(ast);
     }
 
-    func prv beginScope() {
+    func pub beginScope() {
         scopeDepth += 1;
     }
 
-    func prv endScope() {
+    func pub endScope() {
         scopeDepth -= 1;
 
         let popped = 0;
@@ -167,6 +193,60 @@ class Compiler {
         }
     }
 
+    func prv identifierConstant(ident) {
+        return function.chunk.addConstant(Value.String(ident));
+    }
+
+    func pub addLocal(ident, constant) {
+        const local = Local(ident, scopeDepth);
+        local.loopDepth = loopDepth;
+        local.fixed = constant;
+        local.isCaptured = false;
+
+        npvec.append(locals, local);
+
+        localCount += 1;
+    }
+
+    func prv resolveLocal(ident) {
+        for (let i = localCount - 1; i >= 0; i -= 1) {
+            const local = npvec.at(locals, i);
+            if (local.name == ident)
+                return i;
+        }
+
+        return -1;
+    }
+
+    func prv compileFunction(fn) {
+        const compiler = Compiler(function.name.val, fn.getFuncType());
+        compiler.enclosing = this;
+        
+        const args = fn.getArgs();
+        compiler.function.arity = npvec.size(args);
+        compiler.beginScope();
+
+        for (let i = 0; i < compiler.function.arity; i += 1)
+            compiler.addLocal(npvec.at(args, i), true);
+        compiler.compile(fn.getBody());
+
+        compiler.endScope();
+
+        const newFunction = compiler.endCompiler();
+        emitByte(OpCode.CLOSURE, fn.getLine());
+        emitConstant(Value.Function(newFunction), fn.getLine());
+
+        for (let i = 0; i < newFunction.upvalueCount; i += 1) {
+            const upvalue = npvec.at(compiler.upvalues, i);
+
+            if (upvalue.isLocal)
+                emitByte(1, -1);
+            else
+                emitByte(0, -1);
+            emitByte(upvalue.index, -1);
+        }
+    }
+
     func prv compileNode(node) {
         const nodeType = node.getType();
         if (nodeType == NodeType.BODY) {
@@ -175,22 +255,169 @@ class Compiler {
             const statements = node.getChildren();
             for (let i = 0; i < npvec.size(statements); i += 1) {
                 compileNode(npvec.at(statements, i));
-                emitByte(OpCode.POP, -1);
             }
 
             endScope();
-        } else if (nodeType == NodeType.NUMBER) {
+        } 
+
+        // Literals
+        else if (nodeType == NodeType.NUMBER) {
             emitConstant(Value.Number(node.getValue()), node.getLine());
-        } else if (nodeType == NodeType.BINARY) {
+        } 
+        else if (nodeType == NodeType.BOOLEAN) {
+            emitConstant(Value.Bool(node.getValue()), node.getLine());
+        } 
+        else if (nodeType == NodeType.STRING) {
+            emitConstant(Value.String(node.getValue()), node.getLine());
+        } 
+        else if (nodeType == NodeType.NULL) {
+            emitByte(OpCode.NULL, node.getLine());
+        } 
+        else if (nodeType == NodeType.LIST) {
+            const elements = node.getChildren();
+            const argc = npvec.size(elements);
+            for (let i = 0; i < argc; i += 1)
+                compileNode(npvec.at(elements, i));
+            emitBytes(OpCode.MAKE_LIST, argc,  -1);
+        } 
+        
+        // Operator Nodes
+        else if (nodeType == NodeType.BINARY) {
             compileNode(node.getLeft());
             compileNode(node.getRight());
             emitByte(node.getOpcode(), node.getLine());
-        } else if (nodeType == NodeType.UNARY) {
+        } 
+        else if (nodeType == NodeType.UNARY) {
             compileNode(node.getOperand());
             emitByte(node.getOpcode(), node.getLine());
-        } else {
+        } 
+        else if (nodeType == NodeType.CALL) {
+            compileNode(node.getOperand());
+
+            const argc = node.getArgc();
+            const args = node.getArgs();
+            for (let i = 0; i < argc; i += 1)
+                compileNode(npvec.at(args, i));
+            
+            emitBytes(OpCode.CALL, argc, -1);
+        }
+        else if (nodeType == NodeType.IMPORT) {
+            const constant = identifierConstant(node.getLibrary());
+            emitBytes(OpCode.IMPORT, constant, node.getLine());
+        }
+        else if (nodeType == NodeType.INVOKE) {
+            const constant = identifierConstant(node.getName());
+            compileNode(node.getOperand());
+
+            const argc = node.getArgc();
+            const args = node.getArgs();
+            for (let i = 0; i < argc; i += 1)
+                compileNode(npvec.at(args, i));
+            
+            emitBytes(OpCode.INVOKE, constant, -1);
+            emitByte(argc, -1);
+        }
+        else if (nodeType == NodeType.SET_PROPERTY) {
+            compileNode(node.getOperand());
+            compileNode(node.getValue());
+
+            const constant = identifierConstant(node.getName());
+            emitBytes(OpCode.SET_PROPERTY, constant, -1);
+        }
+        else if (nodeType == NodeType.GET_PROPERTY) {
+            compileNode(node.getOperand());
+
+            const constant = identifierConstant(node.getName());
+            emitBytes(OpCode.GET_PROPERTY, constant, -1);
+        }
+        else if (nodeType == NodeType.SET_INDEX) {
+            compileNode(node.getOperand());
+            compileNode(node.getIndex());
+            compileNode(node.getValue());
+            emitByte(OpCode.SET_INDEX, -1);
+        }
+        else if (nodeType == NodeType.AND) {
+            compileNode(node.getLeft());
+            const jump = emitJump(OpCode.JUMP_IF_FALSE, -1);
+            emitByte(OpCode.POP, -1);
+            compileNode(node.getRight());
+            patchJump(jump);
+        }
+        else if (nodeType == NodeType.OR) {
+            compileNode(node.getLeft());
+            const jump = emitJump(OpCode.JUMP_IF_TRUE, -1);
+            emitByte(OpCode.POP, -1);
+            compileNode(node.getRight());
+            patchJump(jump);
+        }
+        else if (nodeType == NodeType.IMPORT_FILE) {
+            emitConstant(Value.String(node.getName()), node.getLine());
+            if (node.getAst() == null) {
+                emitConstant(Value.String(node.getName()), node.getLine());
+                emitByte(OpCode.IMPORT_FILE, node.getLine());
+                return;
+            }
+
+            const compiler = Compiler(node.getName(), FuncType.SCRIPT);
+            compiler.compile(node.getAst());
+            const function = compiler.endCompiler();
+
+            emitConstant(Value.Function(function), node.getLine());
+            emitByte(OpCode.IMPORT_FILE, node.getLine());
+        }
+        
+        // Variable Nodes
+        else if (nodeType == NodeType.DECLARE_GLOBAL) {
+            const constant = identifierConstant(node.getName());
+            compileNode(node.getValue());
+            emitBytes(OpCode.DEFINE_GLOBAL, constant, node.getLine());
+        }
+        else if (nodeType == NodeType.SET_GLOBAL) {
+            const constant = identifierConstant(node.getName());
+            compileNode(node.getValue());
+            emitBytes(OpCode.SET_GLOBAL, constant, node.getLine());
+        }
+        else if (nodeType == NodeType.GET_GLOBAL) {
+            const constant = identifierConstant(node.getName());
+            emitBytes(OpCode.GET_GLOBAL, constant, node.getLine());
+        }
+        else if (nodeType == NodeType.DECLARE_LOCAL) {
+            compileNode(node.getValue());
+            addLocal(node.getName(), node.getConstant());
+        }
+        else if (nodeType == NodeType.SET_LOCAL) {
+            const idx = resolveLocal(node.getName());
+            compileNode(node.getValue());
+            emitBytes(OpCode.SET_LOCAL, idx, node.getLine());
+        }
+        else if (nodeType == NodeType.GET_LOCAL) {
+            const idx = resolveLocal(node.getName());
+            emitBytes(OpCode.GET_LOCAL, idx, node.getLine());
+        }
+        
+        // Function Nodes
+        else if (nodeType == NodeType.FUNCTION) {
+            compileFunction(node);
+        }
+
+        else {
             std.println("Unsupported node type '" + std.asString(nodeType) + "'.");
         }
+
+        if (node.emitPop)
+            emitByte(OpCode.POP, -1);
+
+        // TODO: Capture upvalues on LOCAL nodes
+        // TODO: RETURN node
+        // TODO: BREAK node
+        // TODO: CONTINUE node
+        // TODO: WHILE node
+        // TODO: FOR node
+        // TODO: CLASS node
+        // TODO: THIS node
+        // TODO: SUPER node
+        // TODO: ATTRIBUTE node
+        // TODO: METHOD node
     }
 
     func pub endCompiler() {

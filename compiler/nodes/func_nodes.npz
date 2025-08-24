@@ -33,16 +33,30 @@ class BodyNode <- Node {
 class FuncNode <- Node {
     let prv args;
     let prv body;
+    let prv funcType;
 
-    build(oArgs, oBody) {
+    build(oArgs, oBody, oType) {
         args = oArgs;
         body = oBody;
+        funcType = oType;
 
         type = NodeType.FUNCTION;
     }
 
     func getChildren() {
         return npvec.vec(body);
+    }
+
+    func pub getFuncType() {
+        return funcType;
+    }
+
+    func pub getArgs() {
+        return args;
+    }
+
+    func pub getBody() {
+        return body;
     }
 
     func def string() {

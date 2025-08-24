@@ -15,29 +15,28 @@ class NodeType {
     const pub static SET_PROPERTY   =    9;
     const pub static GET_PROPERTY   =   10;
     const pub static INVOKE         =   11;
-    const pub static GET_INDEX      =   12;
-    const pub static SET_INDEX      =   13;
-    const pub static DECLARE_GLOBAL =   14;
-    const pub static SET_GLOBAL     =   15;
-    const pub static GET_GLOBAL     =   16;
-    const pub static DECLARE_LOCAL  =   17;
-    const pub static SET_LOCAL      =   18;
-    const pub static GET_LOCAL      =   19;
-    const pub static FUNCTION       =   20;
-    const pub static RETURN         =   21;
-    const pub static BREAK          =   22;
-    const pub static CONTINUE       =   23;
-    const pub static WHILE          =   24;
-    const pub static FOR            =   25;
-    const pub static CLASS          =   26;
-    const pub static IMPORT         =   27;
-    const pub static THIS           =   28;
-    const pub static SUPER          =   29;
-    const pub static ATTRIBUTE      =   30;
-    const pub static METHOD         =   31;
-    const pub static AND            =   32;
-    const pub static OR             =   33;
-    const pub static IMPORT_FILE    =   34;
+    const pub static SET_INDEX      =   12;
+    const pub static DECLARE_GLOBAL =   13;
+    const pub static SET_GLOBAL     =   14;
+    const pub static GET_GLOBAL     =   15;
+    const pub static DECLARE_LOCAL  =   16;
+    const pub static SET_LOCAL      =   17;
+    const pub static GET_LOCAL      =   18;
+    const pub static FUNCTION       =   19;
+    const pub static RETURN         =   20;
+    const pub static BREAK          =   21;
+    const pub static CONTINUE       =   22;
+    const pub static WHILE          =   23;
+    const pub static FOR            =   24;
+    const pub static CLASS          =   25;
+    const pub static IMPORT         =   26;
+    const pub static THIS           =   27;
+    const pub static SUPER          =   28;
+    const pub static ATTRIBUTE      =   29;
+    const pub static METHOD         =   30;
+    const pub static AND            =   31;
+    const pub static OR             =   32;
+    const pub static IMPORT_FILE    =   33;
 }
 
 class Node {
@@ -46,6 +45,7 @@ class Node {
     let pub src = null;
     let pub idx = -1;
     let pub len = -1;
+    let pub emitPop = false;
 
     func pub getChildren() {
         return npvec.vec();

@@ -34,6 +34,10 @@ class Value {
         return Value(val, ValueType.BOOL);
     }
 
+    func pub static Function(val) {
+        return Value(val, ValueType.FUNCTION);
+    }
+
     func def eq(other) {
         return other.type == this.type && other.val == this.val;
     }

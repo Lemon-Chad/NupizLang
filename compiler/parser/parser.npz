@@ -322,6 +322,7 @@ class Parser {
                 return res;
 
             npvec.append(args, argName);
+            declareLocal(argName);
 
             if (!match(TokenType.COMMA, null))
                 break;
@@ -350,7 +351,7 @@ class Parser {
 
         endScope();
         
-        return res.success(FuncNode(args, body));
+        return res.success(FuncNode(args, body, funcType));
     }
 
     func prv funDeclaration() {
@@ -841,6 +842,7 @@ class Parser {
                 "Expected ';' after expression."
             ));
         res.advance();
+        node.emitPop = true;
         return res.success(node);
     }
 
@@ -1137,8 +1139,7 @@ class Parser {
         const res = ParseResult();
 
         if (npmap.has(importedASTs, path)) {
-            const ast = npmap.get(importedASTs, path);
-            return res.success(ImportFileNode(path, ast));
+            return res.success(ImportFileNode(path, null));
         }
 
         const cwd = iofile.getCWD();
@@ -1298,7 +1299,7 @@ class Parser {
         }
         
         return res.success(
-            GetIndexNode(left, right).setSource(
+            BinaryNode(left, right, OpCode.GET_INDEX).setSource(
                 left.filename, left.src, left.idx,
                 right.idx + right.len - left.idx
             )

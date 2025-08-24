@@ -52,8 +52,7 @@ class DumpBytes {
 
         dumpValueArray(chunk.constants);
 
-        const codeN = npvec.size(chunk.bytes);
-        writeInt(codeN);
+        writeInt(chunk.count);
         writeBytes(chunk.bytes);
     }
 

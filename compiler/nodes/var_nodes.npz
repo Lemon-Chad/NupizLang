@@ -18,6 +18,18 @@ class DeclareGlobalNode <- Node {
         return npvec.vec(val);
     }
 
+    func pub getName() {
+        return name;
+    }
+
+    func pub getConstant() {
+        return isConstant;
+    }
+
+    func pub getValue() {
+        return val;
+    }
+
     func def string() {
         return "DeclareGlobal('" + name + 
             "', " + std.asString(val) + ")";
@@ -39,6 +51,14 @@ class SetGlobalNode <- Node {
         return npvec.vec(val);
     }
 
+    func pub getName() {
+        return name;
+    }
+
+    func pub getValue() {
+        return val;
+    }
+
     func def string() {
         return "SetGlobal('" + name + 
             "', " + std.asString(val) + ")";
@@ -56,6 +76,10 @@ class GetGlobalNode <- Node {
 
     func getChildren() {
         return npvec.vec();
+    }
+
+    func pub getName() {
+        return name;
     }
 
     func def string() {
@@ -80,6 +104,18 @@ class DeclareLocalNode <- Node {
         return npvec.vec(val);
     }
 
+    func pub getName() {
+        return name;
+    }
+    
+    func pub getValue() {
+        return val;
+    }
+
+    func pub getConstant() {
+        return isConstant;
+    }
+
     func def string() {
         return "DeclareLocal('" + name + 
             "', " + std.asString(val) + ")";
@@ -101,6 +137,14 @@ class SetLocalNode <- Node {
         return npvec.vec(val);
     }
 
+    func pub getName() {
+        return name;
+    }
+    
+    func pub getValue() {
+        return val;
+    }
+
     func def string() {
         return "SetLocal('" + name + 
             "', " + std.asString(val) + ")";
@@ -118,6 +162,10 @@ class GetLocalNode <- Node {
 
     func getChildren() {
         return npvec.vec();
+    }
+
+    func pub getName() {
+        return name;
     }
 
     func def string() {

@@ -1,0 +1,8 @@
+.vscode/*
+vm/.vscode/*
+analysis/*
+build/*
+test/*
+*/*.sh
+lib/*
+.DS_STORE

@@ -506,7 +506,8 @@ bool getInstanceMethod(VM* vm, ObjInstance* inst, ObjString* name, Value* ptr, b
         return false;
     }
 
-    *ptr = attr->val;
+    ObjBoundMethod* bound = newBoundMethod(vm, OBJ_VAL(inst), AS_CLOSURE(attr->val));
+    *ptr = OBJ_VAL(bound);
     return true;
 }
 

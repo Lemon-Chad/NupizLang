@@ -24,6 +24,16 @@ class Local {
     }
 }
 
+class Upvalue {
+    let pub idx;
+    let pub isLocal;
+
+    build(idx, isLocal) {
+        this.idx = idx;
+        this.isLocal = isLocal;
+    }
+}
+
 class Chunk {
     let pub constants;
 
@@ -83,7 +93,7 @@ class Chunk {
 class Compiler {
     let pub enclosing;
 
-    let prv locals;
+    let pub locals;
     let prv localCount;
     let prv scopeDepth;
 
@@ -96,6 +106,9 @@ class Compiler {
     let prv ast;
 
     let prv lastLine;
+
+    let pub upvalues;
+    let prv upvalueCount;
 
     build(name, oType) {
         enclosing = null;
@@ -117,6 +130,9 @@ class Compiler {
         }
 
         ast = null;
+
+        upvalues = npvec.vec();
+        upvalueCount = 0;
     }
 
     func prv emitByte(b, line) {
@@ -208,11 +224,41 @@ class Compiler {
         localCount += 1;
     }
 
-    func prv resolveLocal(ident) {
+    func pub addUpvalue(idx, isLocal) {
+        for (let i = 0; i < function.upvalueCount; i += 1) {
+            const upvalue = npvec.at(upvalues, i);
+            if (upvalue.idx == idx && upvalue.isLocal == isLocal)
+                return i;
+        }
+
+        const upvalue = Upvalue(idx, isLocal);
+        npvec.append(upvalues, upvalue);
+        function.upvalueCount = function.upvalueCount + 1;
+        return function.upvalueCount - 1;
+    }
+
+    func pub resolveLocal(ident) {
         for (let i = localCount - 1; i >= 0; i -= 1) {
             const local = npvec.at(locals, i);
             if (local.name == ident)
                 return i;
+        }
+
+        return -1;
+    }
+
+    func pub resolveUpvalue(ident) {
+        if (enclosing == null) return -1;
+
+        const local = enclosing.resolveLocal(ident);
+        if (local != -1) {
+            npvec.at(enclosing.locals, local).isCaptured = true;
+            return addUpvalue(local, true);
+        }
+
+        const upvalue = enclosing.resolveUpvalue(ident);
+        if (upvalue != -1) {
+            return addUpvalue(upvalue, false);
         }
 
         return -1;
@@ -243,7 +289,7 @@ class Compiler {
                 emitByte(1, -1);
             else
                 emitByte(0, -1);
-            emitByte(upvalue.index, -1);
+            emitByte(upvalue.idx, -1);
         }
     }
 
@@ -386,18 +432,37 @@ class Compiler {
             addLocal(node.getName(), node.getConstant());
         }
         else if (nodeType == NodeType.SET_LOCAL) {
-            const idx = resolveLocal(node.getName());
             compileNode(node.getValue());
-            emitBytes(OpCode.SET_LOCAL, idx, node.getLine());
+
+            let idx = resolveLocal(node.getName());
+            if (idx == -1) {
+                idx = resolveUpvalue(node.getName());
+                emitBytes(OpCode.SET_UPVALUE, idx, node.getLine());
+            } else {
+                emitBytes(OpCode.SET_LOCAL, idx, node.getLine());
+            }
         }
         else if (nodeType == NodeType.GET_LOCAL) {
-            const idx = resolveLocal(node.getName());
-            emitBytes(OpCode.GET_LOCAL, idx, node.getLine());
+            let idx = resolveLocal(node.getName());
+            if (idx == -1) {
+                idx = resolveUpvalue(node.getName());
+                emitBytes(OpCode.GET_UPVALUE, idx, node.getLine());
+            } else {
+                emitBytes(OpCode.GET_LOCAL, idx, node.getLine());
+            }
         }
         
         // Function Nodes
         else if (nodeType == NodeType.FUNCTION) {
             compileFunction(node);
+        }
+        else if (nodeType == NodeType.RETURN) {
+            if (node.getValue().getType() == NodeType.NULL) {
+                emitReturn(node.getLine());
+            } else {
+                compileNode(node.getValue());
+                emitByte(OpCode.RETURN, -1);
+            }
         }
 
         else {
@@ -407,8 +472,6 @@ class Compiler {
         if (node.emitPop)
             emitByte(OpCode.POP, -1);
 
-        // TODO: Capture upvalues on LOCAL nodes
-        // TODO: RETURN node
         // TODO: BREAK node
         // TODO: CONTINUE node
         // TODO: WHILE node

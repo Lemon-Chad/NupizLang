@@ -82,6 +82,10 @@ class ReturnNode <- Node {
         return npvec.vec(val);
     }
 
+    func pub getValue() {
+        return val;
+    }
+
     func def string() {
         return "Return(" + std.asString(val) + ")";
     }

@@ -50,6 +50,8 @@ class Parser {
 
     let prv importedASTs;
 
+    let prv parsingStack;
+
     build(filePath, toks) {
         path = filePath;
         tokens = toks;
@@ -87,6 +89,8 @@ class Parser {
         ctxStack = npvec.vec();
 
         importedASTs = npmap.map();
+
+        parsingStack = npvec.vec(FuncType.SCRIPT);
     }
 
     func prv beginScope() {
@@ -302,6 +306,7 @@ class Parser {
         const res = ParseResult();
 
         beginScope();
+        npvec.append(parsingStack, funcType);
 
         const args = npvec.vec();
         if (!match(TokenType.LPAREN, null))
@@ -350,6 +355,7 @@ class Parser {
             return res;
 
         endScope();
+        npvec.pop(parsingStack);
         
         return res.success(FuncNode(args, body, funcType));
     }
@@ -593,10 +599,10 @@ class Parser {
         const res = ParseResult();
         const start = previous;
 
-        if (scopeDepth == 0)
+        if (npvec.at(parsingStack, -1) == FuncType.SCRIPT)
             return res.failure(Error.InvalidSyntax(
                 current.filename, current.src, 
-                current.idx, current.len,
+                previous.idx, previous.len,
                 "Cannot return from outside of a function."
             ));
         
@@ -614,6 +620,13 @@ class Parser {
                 current.filename, current.src,
                 current.idx, current.len,
                 "Expected ';' after return statement."
+            ));
+
+        if (npvec.at(parsingStack, -1) == FuncType.BUILDER)
+            return res.failure(Error.InvalidSyntax(
+                current.filename, current.src, 
+                start.idx, previous.len + previous.idx - start.idx,
+                "Cannot return value from constructor."
             ));
         
         res.advance();

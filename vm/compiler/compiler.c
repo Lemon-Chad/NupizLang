@@ -640,21 +640,7 @@ static void builder(Parser* parser) {
     emitBytes(parser, OP_METHOD, 1);
 }
 
-static void namedVariable(Parser* parser, Token tok, bool canAssign) {
-    uint8_t getOp, setOp;
-    int arg = resolveLocal(parser, parser->compiler, &tok);
-    if (arg != -1) {
-        getOp = OP_GET_LOCAL;
-        setOp = OP_SET_LOCAL;
-    } else if ((arg = resolveUpvalue(parser, parser->compiler, &tok)) != -1) {
-        getOp = OP_GET_UPVALUE;
-        setOp = OP_SET_UPVALUE;
-    } else {
-        arg = identifierConstant(parser, &tok);
-        getOp = OP_GET_GLOBAL;
-        setOp = OP_SET_GLOBAL;
-    }
-
+static TokenType expressionTok(Parser* parser, bool canAssign) {
     TokenType assignmentToken = TOKEN_NULL;
     if (canAssign) {
         if (match(parser, TOKEN_EQUAL)) {
@@ -669,23 +655,11 @@ static void namedVariable(Parser* parser, Token tok, bool canAssign) {
             assignmentToken = TOKEN_SLASH_EQUAL;
         }
     }
+    return assignmentToken;
+}
 
-    if (assignmentToken == TOKEN_NULL) {
-        emitBytes(parser, getOp, (uint8_t) arg);
-        return;
-    }
-
-    if (setOp == OP_SET_LOCAL && parser->compiler->locals[arg].fixed) {
-        error(parser, "Variable is constant and cannot be modified.");
-        return;
-    }
-
-    if (assignmentToken != TOKEN_EQUAL)
-        emitBytes(parser, getOp, (uint8_t) arg);
-
-    expression(parser);
-
-    switch (assignmentToken) {
+static void expressionOp(Parser* parser, TokenType tok) {
+    switch (tok) {
         case TOKEN_PLUS_EQUAL:
             emitByte(parser, OP_ADD);
             break;
@@ -709,6 +683,41 @@ static void namedVariable(Parser* parser, Token tok, bool canAssign) {
             error(parser, "Unhandled assignment token.\n");
             break;
     }
+}
+
+static void namedVariable(Parser* parser, Token tok, bool canAssign) {
+    uint8_t getOp, setOp;
+    int arg = resolveLocal(parser, parser->compiler, &tok);
+    if (arg != -1) {
+        getOp = OP_GET_LOCAL;
+        setOp = OP_SET_LOCAL;
+    } else if ((arg = resolveUpvalue(parser, parser->compiler, &tok)) != -1) {
+        getOp = OP_GET_UPVALUE;
+        setOp = OP_SET_UPVALUE;
+    } else {
+        arg = identifierConstant(parser, &tok);
+        getOp = OP_GET_GLOBAL;
+        setOp = OP_SET_GLOBAL;
+    }
+
+    TokenType assignmentToken = expressionTok(parser, true);
+
+    if (assignmentToken == TOKEN_NULL) {
+        emitBytes(parser, getOp, (uint8_t) arg);
+        return;
+    }
+
+    if (setOp == OP_SET_LOCAL && parser->compiler->locals[arg].fixed) {
+        error(parser, "Variable is constant and cannot be modified.");
+        return;
+    }
+
+    if (assignmentToken != TOKEN_EQUAL)
+        emitBytes(parser, getOp, (uint8_t) arg);
+
+    expression(parser);
+
+    expressionOp(parser, assignmentToken);
 
     emitBytes(parser, setOp, (uint8_t) arg);
 }
@@ -1117,8 +1126,15 @@ static void dot(Parser* parser, bool canAssign) {
     consume(parser, TOKEN_IDENTIFIER, "Expected property name after '.'.");
     uint8_t name = identifierConstant(parser, &parser->previous);
 
-    if (canAssign && match(parser, TOKEN_EQUAL)) {
+    TokenType assignmentToken = expressionTok(parser, canAssign);
+    if (assignmentToken != TOKEN_NULL) {
+        if (assignmentToken != TOKEN_EQUAL)
+            emitBytes(parser, OP_GET_PROPERTY, name);
+
         expression(parser);
+
+        expressionOp(parser, assignmentToken);
+
         emitBytes(parser, OP_SET_PROPERTY, name);
     } else if (match(parser, TOKEN_LEFT_PAREN)) {
         uint8_t argc = argumentList(parser);
@@ -1309,7 +1325,8 @@ static void parsePrecedence(Parser* parser, Precedence prec) {
         infixRule(parser, canAssign);
     }
 
-    if (canAssign && match(parser, TOKEN_EQUAL)) {
+    TokenType assignmentToken = expressionTok(parser, canAssign);
+    if (assignmentToken != TOKEN_NULL) {
         error(parser, "Cannot perform assignment here.");
     }
 }

@@ -100,7 +100,7 @@ static NativeResult removeNative(VM* vm, int argc, Value* args) {
     }
 
     NPVector* npvector = AS_NPVECTOR(args[0]);
-    size_t idx = (size_t) AS_NUMBER(args[1]);
+    int idx = (int) AS_NUMBER(args[1]);
     size_t len = npvector->vec->size();
     if (idx < 0)
         idx += len;
@@ -136,7 +136,7 @@ static NativeResult atNative(VM* vm, int argc, Value* args) {
     }
 
     NPVector* npvector = AS_NPVECTOR(args[0]);
-    size_t idx = (size_t) AS_NUMBER(args[1]);
+    int idx = AS_NUMBER(args[1]);
     size_t len = npvector->vec->size();
     if (idx < 0)
         idx += len;
@@ -161,7 +161,7 @@ static NativeResult insertNative(VM* vm, int argc, Value* args) {
     }
 
     NPVector* npvector = AS_NPVECTOR(args[0]);
-    size_t idx = (size_t) AS_NUMBER(args[2]);
+    int idx = (int) AS_NUMBER(args[2]);
     size_t len = npvector->vec->size();
     if (idx < 0)
         idx += len;
@@ -188,7 +188,7 @@ static NativeResult setNative(VM* vm, int argc, Value* args) {
     }
 
     NPVector* npvector = AS_NPVECTOR(args[0]);
-    size_t idx = (size_t) AS_NUMBER(args[2]);
+    int idx = (int) AS_NUMBER(args[2]);
     size_t len = npvector->vec->size();
     if (idx < 0)
         idx += len;

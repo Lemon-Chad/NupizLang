@@ -30,7 +30,7 @@ class OpCode {
     const pub static DIVIDE             = 27;
     const pub static RETURN             = 28;
     const pub static POP                = 29;
-    const pub static PN                 = 30;
+    const pub static POP_N              = 30;
     const pub static CLOSE_UPVALUE      = 31;
     const pub static CALL               = 32;
     const pub static CLOSURE            = 33;

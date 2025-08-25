@@ -34,6 +34,18 @@ class Upvalue {
     }
 }
 
+class CodePoint {
+    let pub idx;
+    let pub scopeDepth;
+    let pub loopDepth;
+    
+    build(idx, scopeDepth, loopDepth) {
+        this.idx = idx;
+        this.scopeDepth = scopeDepth;
+        this.loopDepth = loopDepth;
+    }
+}
+
 class Chunk {
     let pub constants;
 
@@ -97,6 +109,7 @@ class Compiler {
     let prv localCount;
     let prv scopeDepth;
 
+    let prv loopPoints;
     let prv loopDepth;
     let prv breakPatches;
 
@@ -117,6 +130,7 @@ class Compiler {
         localCount = 1;
         scopeDepth = 0;
 
+        loopPoints = npvec.vec();
         loopDepth = 0;
         breakPatches = npvec.vec();
 
@@ -169,6 +183,26 @@ class Compiler {
         return function.chunk.count - 2;
     }
 
+    func prv emitLoop(start, line) {
+        emitByte(OpCode.LOOP, line);
+        const offs = function.chunk.count - start + 2;
+        emitBytes(
+            math.mod(math.floor(offs / 256), 256),
+            math.mod(offs, 256),
+            -1
+        );
+    }
+
+    func prv exitLoop(line) {
+        let n = 0;
+        for (let i = localCount - 1; i >= 0; i -= 1) {
+            if (npvec.at(locals, i).loopDepth < loopDepth)
+                break;
+            n += 1;
+        }
+        emitBytes(OpCode.POP_N, n, line);
+    }
+
     func prv patchJump(idx) {
         const jump = function.chunk.count - idx - 2;
         npvec.set(
@@ -194,10 +228,26 @@ class Compiler {
         scopeDepth += 1;
     }
 
+    func pub beginLoop() {
+        npvec.append(loopPoints, CodePoint(function.chunk.count, scopeDepth, loopDepth));
+        loopDepth += 1;
+    }
+
+    func pub endLoop() {
+        loopDepth -= 1;
+        for (let i = npvec.size(breakPatches) - 1; i >= 0; i -= 1) {
+            const patch = npvec.at(breakPatches, i);
+            if (patch.loopDepth <= loopDepth)
+                break;
+            
+            patchJump(patch.idx);
+            npvec.pop(breakPatches);
+        }
+    }
+
     func pub endScope() {
         scopeDepth -= 1;
 
-        let popped = 0;
         while (localCount > 0 && npvec.at(locals, -1).depth > scopeDepth) {
             if (npvec.at(locals, -1).isCaptured) {
                 emitByte(OpCode.CLOSE_UPVALUE, -1);
@@ -206,6 +256,7 @@ class Compiler {
             }
 
             localCount -= 1;
+            npvec.pop(locals);
         }
     }
 
@@ -465,6 +516,97 @@ class Compiler {
             }
         }
 
+        // Control Nodes
+        else if (nodeType == NodeType.IF) {
+            compileNode(node.getCondition());
+
+            const thenJump = emitJump(OpCode.JUMP_IF_FALSE, -1);
+            emitByte(OpCode.POP, -1);
+            compileNode(node.getTrue());
+
+            if (node.getFalse() == null) {
+                patchJump(thenJump);
+                emitByte(OpCode.POP, -1);
+            } else {
+                const elseJump = emitJump(OpCode.JUMP, -1);
+
+                patchJump(thenJump);
+                emitByte(OpCode.POP, -1);
+
+                compileNode(node.getFalse());
+                patchJump(elseJump);
+            }
+        } 
+        else if (nodeType == NodeType.WHILE) {
+            beginLoop();
+
+            const start = function.chunk.count;
+            compileNode(node.getCondition());
+
+            const exitJump = emitJump(OpCode.JUMP_IF_FALSE, -1);
+            emitByte(OpCode.POP, -1);
+            compileNode(node.getBody());
+
+            emitLoop(start, -1);
+
+            patchJump(exitJump);
+            emitByte(OpCode.POP, -1);
+
+            endLoop();
+        }
+        else if (nodeType == NodeType.FOR) {
+            beginScope();
+
+            if (node.getInitializer() != null)
+                compileNode(node.getInitializer());
+
+            let start = function.chunk.count;
+            let exitJump = -1;
+            if (node.getCondition() != null) {
+                compileNode(node.getCondition());
+                exitJump = emitJump(OpCode.JUMP_IF_FALSE, -1);
+                emitByte(OpCode.POP, -1);
+            }
+
+            if (node.getIterator() != null) {
+                const bodyJump = emitJump(OpCode.JUMP, node.getIterator().getLine());
+                
+                beginLoop();
+                const incrementStart = function.chunk.count;
+
+                compileNode(node.getIterator());
+                emitByte(OpCode.POP, -1);
+
+                emitLoop(start, -1);
+                start = incrementStart;
+                patchJump(bodyJump);
+            } else {
+                beginLoop();
+            }
+
+            compileNode(node.getBody());
+            emitLoop(start, -1);
+
+            if (exitJump != -1) {
+                patchJump(exitJump);
+                emitByte(OpCode.POP, -1);
+            }
+
+            endLoop();
+            endScope();
+        }
+        else if (nodeType == NodeType.BREAK) {
+            exitLoop(node.getLine());
+            const idx = emitJump(OpCode.JUMP, -1);
+            npvec.append(breakPatches, CodePoint(idx, scopeDepth, loopDepth));
+        } 
+        else if (nodeType == NodeType.CONTINUE) {
+            exitLoop(node.getLine());
+
+            const idx = npvec.at(loopPoints, -1).idx;
+            emitLoop(idx, -1);
+        }
+
         else {
             std.println("Unsupported node type '" + std.asString(nodeType) + "'.");
         }
@@ -472,10 +614,6 @@ class Compiler {
         if (node.emitPop)
             emitByte(OpCode.POP, -1);
 
-        // TODO: BREAK node
-        // TODO: CONTINUE node
-        // TODO: WHILE node
-        // TODO: FOR node
         // TODO: CLASS node
         // TODO: THIS node
         // TODO: SUPER node

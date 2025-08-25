@@ -45,6 +45,7 @@ class Parser {
     let prv len;
     let prv rules;
 
+    let prv loopDepth;
     let prv scopeDepth;
     let prv ctxStack;
 
@@ -85,6 +86,7 @@ class Parser {
             TokenType.LBRACKET,         [list,      index,  Precedence.CALL]
         );
 
+        loopDepth = 0;
         scopeDepth = 0;
         ctxStack = npvec.vec();
 
@@ -701,10 +703,14 @@ class Parser {
             ));
         res.advance();
 
+        loopDepth += 1;
+
         const body = res.register(statement());
         if (res.hasError())
             return res;
         
+        loopDepth -= 1;
+
         return res.success(
             WhileNode(condition, body)
                 .tokSource(start, previous)
@@ -765,12 +771,16 @@ class Parser {
         }
         res.advance();
 
+        loopDepth += 1;
+
         const body = res.register(statement());
         if (res.hasError())
             return res;
         
         endScope();
         
+        loopDepth -= 1;
+
         return res.success(
             ForNode(initializer, condition, iterator, body)
                 .tokSource(start, previous)
@@ -806,6 +816,13 @@ class Parser {
         } else if (match(TokenType.KEYWORD, "break") ||
                 match(TokenType.KEYWORD, "continue")) {
             res.advance();
+
+            if (loopDepth == 0)
+                return res.failure(Error.InvalidSyntax(
+                    previous.filename, previous.src,
+                    previous.idx, previous.len,
+                    "Cannot " + text + " in non-loop context."
+                ));
 
             const start = previous;
             const text = previous.text;

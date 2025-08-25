@@ -37,6 +37,7 @@ class NodeType {
     const pub static AND            =   31;
     const pub static OR             =   32;
     const pub static IMPORT_FILE    =   33;
+    const pub static IF             =   34;
 }
 
 class Node {

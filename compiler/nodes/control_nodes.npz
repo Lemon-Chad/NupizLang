@@ -11,12 +11,26 @@ class IfNode <- Node {
         condition = oCondition;
         ifTrue = oTrue;
         ifFalse = oFalse;
+
+        type = NodeType.IF;
     }
 
     func getChildren() {
         if (ifFalse == null)
             return npvec.vec(condition, ifTrue);
         return npvec.vec(condition, ifTrue, ifFalse);
+    }
+
+    func pub getCondition() {
+        return condition;
+    }
+
+    func pub getTrue() {
+        return ifTrue;
+    }
+
+    func pub getFalse() {
+        return ifFalse;
     }
 
     func def string() {
@@ -63,6 +77,14 @@ class WhileNode <- Node {
         return npvec.vec(condition, body);
     }
 
+    func pub getCondition() {
+        return condition;
+    }
+
+    func pub getBody() {
+        return body;
+    }
+
     func def string() {
         return "While(" + std.asString(condition) + 
             " -> " + std.asString(body) + ")";
@@ -93,6 +115,22 @@ class ForNode <- Node {
         if (iterator != null)
             npvec.append(children, iterator);
         return children;
+    }
+
+    func pub getInitializer() {
+        return initializer;
+    }
+
+    func pub getCondition() {
+        return condition;
+    }
+
+    func pub getIterator() {
+        return iterator;
+    }
+
+    func pub getBody() {
+        return body;
     }
 
     func def string() {

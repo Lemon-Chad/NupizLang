@@ -3,6 +3,28 @@ import npvec;
 import npmap;
 unpack import "./node.npz";
 
+class DefaultMethods {
+    const pub static STRING         =   0;
+    const pub static EQ             =   1;
+    const pub static HASH           =   2;
+
+    func static getMapping(name) {
+        const MAPPING = npmap.map(
+            "string",       STRING,
+            "eq",           EQ,
+            "hash",         HASH
+        );
+
+        if (!npmap.has(MAPPING, name))
+            return -1;
+        return npmap.get(MAPPING, name);
+    }
+
+    func static hasMapping(name) {
+        return getMapping(name) != -1;
+    }
+}
+
 class AttrNode <- Node {
     let prv name;
     let prv val;
@@ -38,8 +60,30 @@ class AttrNode <- Node {
         return res + ")";
     }
 
-    func getName() {
+    func pub getName() {
         return name;
+    }
+
+    func pub getValue() {
+        return val;
+    }
+
+    func pub getConstant() {
+        if (isConstant)
+            return 1;
+        return 0;
+    }
+    
+    func pub getPublic() {
+        if (isPrivate)
+            return 0;
+        return 1;
+    }
+    
+    func pub getStatic() {
+        if (isStatic)
+            return 1;
+        return 0;
     }
 }
 
@@ -81,8 +125,30 @@ class MethodNode <- Node {
         return res + ")";
     }
 
-    func getName() {
+    func pub getName() {
         return name;
+    }
+
+    func pub getFunction() {
+        return function;
+    }
+
+    func pub getDefault() {
+        if (isDefault)
+            return 2;
+        return 0;
+    }
+    
+    func pub getPublic() {
+        if (isPrivate)
+            return 0;
+        return 1;
+    }
+    
+    func pub getStatic() {
+        if (isStatic)
+            return 1;
+        return 0;
     }
 }
 
@@ -131,6 +197,26 @@ class ClassNode <- Node {
             );
         
         return children;
+    }
+
+    func pub getName() {
+        return name;
+    }
+
+    func pub getSuper() {
+        return superclass;
+    }
+
+    func pub getBuilder() {
+        return builder;
+    }
+
+    func pub getMethods() {
+        return methods;
+    }
+
+    func pub getFields() {
+        return fields;
     }
 
     func def string() {

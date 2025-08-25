@@ -158,6 +158,48 @@ class InvokeNode <- Node {
     }
 }
 
+class SuperInvokeNode <- Node {
+    let prv name;
+    let prv args;
+    let prv argc;
+
+    build(oName, oArgs) {
+        name = oName;
+        args = oArgs;
+        argc = npvec.size(args);
+
+        type = NodeType.SUPER_INVOKE;
+    }
+
+    func getChildren() {
+        const res = npvec.vec();
+        for (let i = 0; i < argc; i += 1)
+            npvec.append(res, npvec.at(args, i));
+        return res;
+    }
+
+    func pub getName() {
+        return name;
+    }
+
+    func pub getArgs() {
+        return args;
+    }
+
+    func pub getArgc() {
+        return argc;
+    }
+
+    func def string() {
+        let res = "SuperInvoke(" + name + "', [";
+        for (let i = 0; i < argc; i += 1)
+            res += std.asString(npvec.at(args, i)) + ", ";
+        if (argc > 0)
+            res = std.slice(res, 0, -3);
+        return res + "])";
+    }
+}
+
 class GetPropertyNode <- Node {
     let prv operand;
     let prv name;

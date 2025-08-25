@@ -1,11 +1,13 @@
 import math;
 import npvec;
+import npmap;
 import std;
 
 unpack import "./op_codes.npz";
 unpack import "./value.npz";
 
 unpack import "../nodes/func_nodes.npz";
+unpack import "../nodes/class_nodes.npz";
 
 class Local {
     let pub name;
@@ -221,6 +223,7 @@ class Compiler {
         ast = tree;
         lastLine = 1;
 
+        scopeDepth -= 1;
         compileNode(ast);
     }
 
@@ -313,6 +316,32 @@ class Compiler {
         }
 
         return -1;
+    }
+
+    func prv localVariable(name, line) {
+        let idx = resolveLocal(name);
+        if (idx == -1) {
+            idx = resolveUpvalue(name);
+            if (idx == -1)
+                return -1;
+            
+            emitBytes(OpCode.GET_UPVALUE, idx, line);
+            return 2;
+        } else {
+            emitBytes(OpCode.GET_LOCAL, idx, line);
+            return 1;
+        }
+
+        return -1;
+    }
+
+    func prv getVariable(name, line) {
+        const res = localVariable(name, line);
+        if (res != -1)
+            return;
+        
+        const constant = identifierConstant(name);
+        emitBytes(OpCode.GET_GLOBAL, constant, line);
     }
 
     func prv compileFunction(fn) {
@@ -414,6 +443,18 @@ class Compiler {
             emitBytes(OpCode.INVOKE, constant, -1);
             emitByte(argc, -1);
         }
+        else if (nodeType == NodeType.SUPER_INVOKE) {
+            getVariable("super", node.getLine());
+            
+            const name = identifierConstant(node.getName());
+            const argc = node.getArgc();
+            const args = node.getArgs();
+            for (let i = 0; i < argc; i += 1)
+                compileNode(npvec.at(args, i));
+            
+            emitBytes(OpCode.SUPER_INVOKE, name, node.getLine());
+            emitByte(argc, -1);
+        }
         else if (nodeType == NodeType.SET_PROPERTY) {
             compileNode(node.getOperand());
             compileNode(node.getValue());
@@ -494,13 +535,13 @@ class Compiler {
             }
         }
         else if (nodeType == NodeType.GET_LOCAL) {
-            let idx = resolveLocal(node.getName());
-            if (idx == -1) {
-                idx = resolveUpvalue(node.getName());
-                emitBytes(OpCode.GET_UPVALUE, idx, node.getLine());
-            } else {
-                emitBytes(OpCode.GET_LOCAL, idx, node.getLine());
-            }
+            localVariable(node.getName(), node.getLine());
+        }
+        else if (nodeType == NodeType.SUPER) {
+            getVariable("super", node.getLine());
+
+            const name = identifierConstant(node.getName());
+            emitBytes(OpCode.GET_SUPER, name, node.getLine());
         }
         
         // Function Nodes
@@ -607,18 +648,78 @@ class Compiler {
             emitLoop(idx, -1);
         }
 
+        // Class Nodes
+        else if (nodeType == NodeType.CLASS) {
+            const name = identifierConstant(node.getName());
+            emitBytes(OpCode.CLASS, name, node.getLine());
+            if (scopeDepth > 0) {
+                addLocal(name, true);
+            } else {
+                emitBytes(OpCode.DEFINE_GLOBAL, name, node.getLine());
+            }
+
+            if (node.getSuper() != null) {
+                beginScope();
+                addLocal("super", true);
+
+                compileNode(node.getSuper());
+                getVariable(node.getName(), node.getSuper().getLine());
+                emitByte(OpCode.INHERIT, -1);
+            }
+
+            getVariable(node.getName(), -1);
+
+            const fields = node.getFields();
+            const fieldKeys = npmap.keys(fields);
+            for (let i = 0; i < npvec.size(fieldKeys); i += 1) {
+                const field = npmap.get(fields, npvec.at(fieldKeys, i));
+
+                const constant = identifierConstant(field.getName());
+
+                compileNode(field.getValue());
+
+                emitBytes(OpCode.ATTRIBUTE, constant, -1);
+                emitBytes(field.getConstant(), field.getPublic(), -1);
+                emitByte(field.getStatic(), -1);
+            }
+
+            const builder = node.getBuilder();
+            if (builder != null) {
+                compileNode(builder);
+                emitBytes(OpCode.METHOD, 1, builder.getLine());
+            }
+
+            const methods = node.getMethods();
+            const methodKeys = npmap.keys(methods);
+            for (let i = 0; i < npvec.size(methodKeys); i += 1) {
+                const method = npmap.get(methods, npvec.at(methodKeys, i));
+
+                let constant;
+                if (method.getDefault() == 2) {
+                    constant = DefaultMethods.getMapping(method.getName());
+                } else {
+                    constant = identifierConstant(method.getName());
+                }
+
+                compileNode(method.getFunction());
+                emitBytes(OpCode.METHOD, method.getDefault(), -1);
+                emitByte(constant, -1);
+                if (method.getDefault() == 0)
+                    emitBytes(method.getPublic(), method.getStatic(), -1);
+            }
+
+            emitByte(OpCode.POP, -1);
+
+            if (node.getSuper() != null) 
+                endScope();
+        }
+
         else {
             std.println("Unsupported node type '" + std.asString(nodeType) + "'.");
         }
 
         if (node.emitPop)
             emitByte(OpCode.POP, -1);
-
-        // TODO: CLASS node
-        // TODO: THIS node
-        // TODO: SUPER node
-        // TODO: ATTRIBUTE node
-        // TODO: METHOD node
     }
 
     func pub endCompiler() {

@@ -52,6 +52,7 @@ class Parser {
     let prv importedASTs;
 
     let prv parsingStack;
+    let prv classStack;
 
     build(filePath, toks) {
         path = filePath;
@@ -93,6 +94,8 @@ class Parser {
         importedASTs = npmap.map();
 
         parsingStack = npvec.vec(FuncType.SCRIPT);
+
+        classStack = npvec.vec();
     }
 
     func prv beginScope() {
@@ -114,6 +117,8 @@ class Parser {
     }
 
     func prv declareLocal(name) {
+        if (scopeDepth == 0) return;
+
         npmap.emplace(npvec.at(ctxStack, -1), name, null);
     }
 
@@ -309,6 +314,7 @@ class Parser {
 
         beginScope();
         npvec.append(parsingStack, funcType);
+        declareLocal("this");
 
         const args = npvec.vec();
         if (!match(TokenType.LPAREN, null))
@@ -458,10 +464,19 @@ class Parser {
         const name = res.register(getIdentifier());
         if (res.hasError())
             return res;
+        
+        if (isDefault && !DefaultMethods.hasMapping(name))
+            return res.failure(Error.InvalidSyntax(
+                previous.filename, previous.src,
+                previous.idx, previous.len,
+                "Unknown default method '" + name + "'."
+            ));
 
         const fn = res.register(function(FuncType.METHOD));
         if (res.hasError())
             return res;
+        
+        fn.tokSource(start, previous);
         
         return res.success(
             MethodNode(name, fn, isPrivate, isStatic, isDefault)
@@ -508,6 +523,9 @@ class Parser {
             superclass = res.register(variable(false));
             if (res.hasError())
                 return res;
+                
+            beginScope();
+            declareLocal("super");
         }
 
         if (!match(TokenType.LBRACE, null))
@@ -517,6 +535,8 @@ class Parser {
                 "Expected '{' before class body."
             ));
         res.advance();
+
+        npvec.append(classStack, superclass);
 
         let builder;
         const methods = npmap.map();
@@ -578,6 +598,9 @@ class Parser {
                 ));
             }
         }
+
+        npvec.pop(classStack);
+
         if (!match(TokenType.RBRACE, null))
             return res.failure(Error.ExpectedCharError(
                 current.filename, current.src,
@@ -586,13 +609,18 @@ class Parser {
             ));
         res.advance();
 
+        if (superclass != null)
+            endScope();
+
         const clazz = ClassNode(
             name, superclass, 
             builder, methods, fields
         ).tokSource(start, previous);
+
+        declareLocal(clazz);
         
         return res.success(
-            declareVariable(name, clazz, true)
+            clazz
                 .tokSource(start, previous)
         );
     }
@@ -1248,15 +1276,61 @@ class Parser {
         } else if (tok.text == "unpack") {
             return unary(canAssign);
         } else if (tok.text == "this") {
-            return res.success(
-                ThisNode()
-                    .tokSource(previous, previous)
-            );
+            if (npvec.size(classStack) == 0)
+                return res.failure(Error.InvalidSyntax(
+                    previous.filename, previous.src,
+                    previous.idx, previous.len,
+                    "Cannot use 'this' outside of class context."
+                ));
+            return variable(false);
         } else if (tok.text == "super") {
-            return res.success(
-                SuperNode()
-                    .tokSource(previous, previous)
-            );
+            if (npvec.size(classStack) == 0)
+                return res.failure(Error.InvalidSyntax(
+                    previous.filename, previous.src,
+                    previous.idx, previous.len,
+                    "Cannot use 'super' outside of class context."
+                ));
+            if (npvec.at(classStack, -1) == null)
+                return res.failure(Error.InvalidSyntax(
+                    previous.filename, previous.src,
+                    previous.idx, previous.len,
+                    "Cannot use 'super' inside a class without a parent."
+                ));
+
+            const start = previous;
+            
+            if (!match(TokenType.DOT, null))
+                return res.failure(Error.ExpectedCharError(
+                    current.filename, current.src,
+                    current.idx, current.len,
+                    "Expected '.' after super."
+                ));
+            res.advance();
+
+            if (!match(TokenType.IDENTIFIER, null))
+                return res.failure(Error.ExpectedCharError(
+                    current.filename, current.src,
+                    current.idx, current.len,
+                    "Expected superclass method or attribute name."
+                ));
+            res.advance();
+
+            const name = previous.text;
+            if (match(TokenType.LPAREN, null)) {
+                res.advance();
+                const args = res.register(argumentList());
+                if (res.hasError())
+                    return res;
+                return res.success(
+                    SuperInvokeNode(name, args)
+                        .tokSource(start, previous)
+                );
+            } else {
+                return res.success(
+                    SuperNode(name)
+                        .tokSource(start, previous)
+                );
+            }
         } else if (tok.text == "import") {
             const node = res.register(importExpression());
             if (res.hasError())

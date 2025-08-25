@@ -748,7 +748,7 @@ static void classDeclaration(Parser* parser) {
     parser->classCompiler = &classCompiler;
 
     if (match(parser, TOKEN_LEFT_ARROW)) {
-        consume(parser, TOKEN_IDENTIFIER, "Expecteded superclass name.");
+        consume(parser, TOKEN_IDENTIFIER, "Expected superclass name.");
         variable(parser, false);
 
         if (identifiersEqual(&className, &parser->previous)) {

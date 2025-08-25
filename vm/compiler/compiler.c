@@ -1126,14 +1126,8 @@ static void dot(Parser* parser, bool canAssign) {
     consume(parser, TOKEN_IDENTIFIER, "Expected property name after '.'.");
     uint8_t name = identifierConstant(parser, &parser->previous);
 
-    TokenType assignmentToken = expressionTok(parser, canAssign);
-    if (assignmentToken != TOKEN_NULL) {
-        if (assignmentToken != TOKEN_EQUAL)
-            emitBytes(parser, OP_GET_PROPERTY, name);
-
+    if (canAssign && match(parser, TOKEN_EQUAL)) {
         expression(parser);
-
-        expressionOp(parser, assignmentToken);
 
         emitBytes(parser, OP_SET_PROPERTY, name);
     } else if (match(parser, TOKEN_LEFT_PAREN)) {

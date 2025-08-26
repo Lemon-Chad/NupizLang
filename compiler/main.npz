@@ -15,8 +15,8 @@ func main(args) {
     let inputFile;
     let outputFile;
 
-    for (let i = 0; i < std.length(args); i += 1) {
-        if (std.length(args[i]) != 2 || args[i] != "-") {
+    for (let i = 0; i < std.length(args); i += 2) {
+        if (std.length(args[i]) != 2 || args[i][0] != "-") {
             std.println("Expected flag.");
             return;
         }
@@ -64,11 +64,11 @@ func main(args) {
         return;
     }
 
-    const absPath = iofile.getAbsPath(args[0]);
-    iofile.setCWD(iofile.getFileDirectory(args[0]));
+    const absPath = iofile.getAbsPath(inputFile);
+    iofile.setCWD(iofile.getFileDirectory(inputFile));
     const fp = iofile.openFile(absPath, "r");
     const src = iofile.readFile(fp);
-    const filename = formatPkg.getFilename(args[0]);
+    const filename = formatPkg.getFilename(inputFile);
     iofile.closeFile(fp);
 
     const lexer = lexerPkg.Lexer(filename, src);
@@ -91,7 +91,7 @@ func main(args) {
 
     const dumper = dumperPkg.DumpBytes();
     dumper.dumpFunction(function);
-    dumper.writeToFile(absPath + ".nux");
+    dumper.writeToFile(outputFile);
 }
 
 std.main(main);

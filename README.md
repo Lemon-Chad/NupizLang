@@ -13,9 +13,11 @@
 - [x] File IO
 - [x] Fast vectors
 - [x] Dynamic maps
-- [ ] Self hosted compiler
+- [x] Self hosted compiler
 - [ ] Double pass compiling
-- [ ] Static typing
-- [ ] Compile time optimizations
+    - [ ] Global variable validator
+    - [ ] Type collector
+    - [ ] Type checker
+    - [ ] Compile time optimizations
 - [ ] Package system
 - [ ] Bundling into executable

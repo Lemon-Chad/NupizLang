@@ -1140,7 +1140,7 @@ static void dot(Parser* parser, bool canAssign) {
 }
 
 static void indx(Parser* parser, bool canAssign) {
-    parsePrecedence(parser, PREC_CALL);
+    expression(parser);
     consume(parser, TOKEN_RIGHT_BRACKET, "Expected ']' after index.");
 
     if (canAssign && match(parser, TOKEN_EQUAL)) {

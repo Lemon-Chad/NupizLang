@@ -1377,7 +1377,7 @@ class Parser {
     func prv index(left, canAssign) {
         const res = ParseResult();
 
-        const right = res.register(parsePrecedence(Precedence.CALL));
+        const right = res.register(expression());
         if (res.hasError())
             return res;
         

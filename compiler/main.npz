@@ -19,9 +19,9 @@ func main(args) {
         return;
     }
 
-    iofile.setCWD(iofile.getFileDirectory(args[0]));
     const absPath = iofile.getAbsPath(args[0]);
-    const fp = iofile.openFile(args[0], "r");
+    iofile.setCWD(iofile.getFileDirectory(args[0]));
+    const fp = iofile.openFile(absPath, "r");
     const src = iofile.readFile(fp);
     const filename = formatPkg.getFilename(args[0]);
     iofile.closeFile(fp);

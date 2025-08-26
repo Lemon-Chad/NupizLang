@@ -565,18 +565,14 @@ class Compiler {
             emitByte(OpCode.POP, -1);
             compileNode(node.getTrue());
 
-            if (node.getFalse() == null) {
-                patchJump(thenJump);
-                emitByte(OpCode.POP, -1);
-            } else {
-                const elseJump = emitJump(OpCode.JUMP, -1);
+            const elseJump = emitJump(OpCode.JUMP, -1);
+            patchJump(thenJump);
+            emitByte(OpCode.POP, -1);
 
-                patchJump(thenJump);
-                emitByte(OpCode.POP, -1);
-
+            if (node.getFalse() != null)
                 compileNode(node.getFalse());
-                patchJump(elseJump);
-            }
+            
+            patchJump(elseJump);
         } 
         else if (nodeType == NodeType.WHILE) {
             beginLoop();

@@ -260,7 +260,7 @@ class Parser {
         if (res.hasError())
             return res;
 
-        let val = NullNode();
+        let val = NullNode().tokSource(previous, previous);
         if (match(TokenType.EQUAL, null)) {
             res.advance();
             val = res.register(expression());
@@ -477,7 +477,7 @@ class Parser {
             return res;
         
         fn.tokSource(start, previous);
-        
+
         return res.success(
             MethodNode(name, fn, isPrivate, isStatic, isDefault)
                 .tokSource(start, previous)
@@ -639,7 +639,7 @@ class Parser {
         if (match(TokenType.SEMICOLON, null)) {
             res.advance();
             return res.success(
-                ReturnNode(NullNode())
+                ReturnNode(NullNode().tokSource(start, previous))
                     .tokSource(start, previous)
             );
         }

@@ -1,0 +1,71 @@
+import std;
+import npvec;
+
+class UnresolvedIdentifier {
+    let prv identifier;
+    let prv type;
+
+    build(oIdent, oType) {
+        identifier = oIdent;
+        type = oType;
+    }
+
+    func pub getIdentifier() {
+        return identifier;
+    }
+
+    func pub getType() {
+        return type;
+    }
+
+    func def string() {
+        return "'" + identifier + "': " + std.asString(type);
+    }
+}
+
+class UnresolvedType {
+    let prv path;
+    let prv args;
+    let prv nullable;
+
+    build(oPath, oArgs, oNullable) {
+        path = oPath;
+        args = oArgs;
+        nullable = oNullable;
+    }
+
+    func pub getPath() {
+        return path;
+    }
+
+    func pub getArgs() {
+        return args;
+    }
+
+    func pub getNullable() {
+        return nullable;
+    }
+
+    func def string() {
+        let res = "";
+        for (let i = 0; i < npvec.size(path); i += 1) {
+            res += std.asString(npvec.at(path, i));
+            if (i + 1 < npvec.size(path))
+                res += ".";
+        }
+
+        if (npvec.size(args) > 0) {
+            res += "<";
+            for (let i = 0; i < npvec.size(args); i += 1) {
+                res += std.asString(npvec.at(args, i));
+                if (i + 1 < npvec.size(args))
+                    res += ", ";
+            }
+            res += ">";
+        }
+
+        if (nullable)
+            res += "?";
+        return res;
+    }
+}

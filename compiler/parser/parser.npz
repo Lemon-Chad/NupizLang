@@ -19,6 +19,8 @@ unpack import "../nodes/class_nodes.npz";
 
 unpack import "../compiler/op_codes.npz";
 
+unpack import "../typing/types.npz";
+
 class Precedence {
     const pub static NONE           =  0;
     const pub static ASSIGNMENT     =  1;
@@ -34,6 +36,7 @@ class Precedence {
 }
 
 class Parser {
+    const prv staticTyping = false;
     const prv debug = false;
 
     let prv path;
@@ -53,6 +56,8 @@ class Parser {
 
     let prv parsingStack;
     let prv classStack;
+
+    let prv globals;
 
     build(filePath, toks) {
         path = filePath;
@@ -96,6 +101,8 @@ class Parser {
         parsingStack = npvec.vec(FuncType.SCRIPT);
 
         classStack = npvec.vec();
+
+        globals = npmap.map();
     }
 
     func prv beginScope() {
@@ -131,11 +138,6 @@ class Parser {
     func prv advance() {
         idx += 1;
         updateTok();
-
-        if (debug)
-            std.println(
-                "token[" + std.asString(idx) + "] = " + std.asString(current)
-            );
     }
 
     func prv peek(dist) {
@@ -229,13 +231,13 @@ class Parser {
         ));
     }
 
-    func prv declareVariable(name, val, isConstant) {
+    func prv declareVariable(name, type, val, isConstant) {
         if (scopeDepth > 0) {
             declareLocal(name);
-            return DeclareLocalNode(name, val, isConstant);
+            return DeclareLocalNode(name, type, val, isConstant);
         }
 
-        return DeclareGlobalNode(name, val, isConstant);
+        return DeclareGlobalNode(name, type, val, isConstant);
     }
 
     func prv getIdentifier() {
@@ -259,6 +261,10 @@ class Parser {
         const name = res.register(getIdentifier());
         if (res.hasError())
             return res;
+        
+        const type = res.register(parseHint(TokenType.COLON, "Expected ':' after variable name."));
+        if (res.hasError())
+            return res;
 
         let val = NullNode().tokSource(previous, previous);
         if (match(TokenType.EQUAL, null)) {
@@ -277,7 +283,7 @@ class Parser {
         res.advance();
 
         return res.success(
-            declareVariable(name, val, isConstant)
+            declareVariable(name, type, val, isConstant)
                 .tokSource(start, previous)
         );
     }
@@ -308,6 +314,77 @@ class Parser {
                 .tokSource(start, previous)
         );        
     }
+    
+    func prv parseHint(token, msg) {
+        const res = ParseResult();
+        if (!staticTyping) return res.success(null);
+
+        if (!match(token, null))
+            return res.failure(Error.InvalidSyntax(
+                current.filename, current.src,
+                current.idx, current.len,
+                msg
+            ));
+        res.advance();
+        
+        const type = res.register(parseType());
+        if (res.hasError())
+            return res;
+        return res.success(type);
+    }
+
+    func prv parseType() {
+        const res = ParseResult();
+        if (!staticTyping) return res.success(null); 
+
+        const path = npvec.vec();
+        while (true) {
+            if (!match(TokenType.IDENTIFIER, null))
+                return res.failure(Error.InvalidSyntax(
+                    current.filename, current.src,
+                    current.idx, current.len,
+                    "Expected type name or path."
+                ));
+            res.advance();
+            npvec.append(path, previous.text);
+            
+            if (!match(TokenType.DOT, null))
+                break;
+            res.advance();
+        }
+
+        const args = npvec.vec();
+        if (match(TokenType.LESS, null)) {
+            res.advance();
+
+            while (true) {
+                const arg = res.register(parseType());
+                if (res.hasError())
+                    return res;
+                
+                npvec.append(args, arg);
+                if (!match(TokenType.COMMA, null))
+                    break;
+                res.advance();
+            }
+
+            if (!match(TokenType.GREATER, null))
+                return res.failure(Error.InvalidSyntax(
+                    current.filename, current.src,
+                    current.idx, current.len,
+                    "Expected closing '>' for type arguments."
+                ));
+            res.advance();
+        }
+
+        let nullable = false;
+        if (match(TokenType.QUESTION_MARK, null)) {
+            res.advance();
+            nullable = true;
+        }
+
+        return res.success(UnresolvedType(path, args, nullable));
+    }
 
     func prv function(funcType) {
         const res = ParseResult();
@@ -333,8 +410,15 @@ class Parser {
             const argName = res.register(getIdentifier());
             if (res.hasError())
                 return res;
+            
+            const typeName = res.register(parseHint(
+                TokenType.COLON, 
+                "Expected ':' after parameter declaration."
+            ));
+            if (res.hasError())
+                return res;
 
-            npvec.append(args, argName);
+            npvec.append(args, UnresolvedIdentifier(argName, typeName));
             declareLocal(argName);
 
             if (!match(TokenType.COMMA, null))
@@ -349,6 +433,36 @@ class Parser {
                 "Expected ')' after function arguments."
             ));
         res.advance();
+
+        let returnType = UnresolvedType(
+            npvec.vec("void"), npvec.vec(), 
+            false
+        );
+        if (staticTyping && match(TokenType.RIGHT_ARROW, null)) {
+            res.advance();
+            returnType = res.register(parseType());
+            if (res.hasError())
+                return res;
+        }
+
+        if (match(TokenType.BIG_ARROW, null)) {
+            res.advance();
+
+            const returnValue = res.register(expressionStatement());
+            if (res.hasError())
+                return res;
+            returnValue.emitPop = false;
+
+            endScope();
+            npvec.pop(parsingStack);
+            return res.success(FuncNode(
+                args, returnType,
+                ReturnNode(returnValue).setSource(
+                    returnValue.filename, returnValue.src,
+                    returnValue.idx, returnValue.len
+                ), funcType
+            ));
+        }
 
         if (!match(TokenType.LBRACE, null))
             return res.failure(Error.ExpectedCharError(
@@ -365,7 +479,7 @@ class Parser {
         endScope();
         npvec.pop(parsingStack);
         
-        return res.success(FuncNode(args, body, funcType));
+        return res.success(FuncNode(args, returnType, body, funcType));
     }
 
     func prv funDeclaration() {
@@ -380,10 +494,14 @@ class Parser {
         if (res.hasError())
             return res;
         fn.tokSource(start, previous);
-        
+
         return res.success(
-            declareVariable(name, fn, true)
-                .tokSource(start, previous)
+            declareVariable(
+                name, 
+                fn.getAsType(), 
+                fn, 
+                true
+            ).tokSource(start, previous)
         );
     }
 

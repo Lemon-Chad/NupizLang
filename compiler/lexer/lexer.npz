@@ -249,6 +249,10 @@ class Lexer {
                 addToken(TokenType.DOT, ".");
             } else if (match(";")) {
                 addToken(TokenType.SEMICOLON, ";");
+            } else if (match(":")) {
+                addToken(TokenType.COLON, ":");
+            } else if (match("?")) {
+                addToken(TokenType.QUESTION_MARK, "?");
             }
             // End of single character tokens.
 
@@ -280,6 +284,8 @@ class Lexer {
             } else if (match("=")) {
                 if (match("="))
                     addToken(TokenType.EQUAL_EQUAL, "==");
+                else if (match(">"))
+                    addToken(TokenType.BIG_ARROW, "=>");
                 else
                     addToken(TokenType.EQUAL, "=");
             } else if (match("!")) {

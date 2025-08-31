@@ -32,11 +32,13 @@ class BodyNode <- Node {
 
 class FuncNode <- Node {
     let prv args;
+    let prv returnType;
     let prv body;
     let prv funcType;
 
-    build(oArgs, oBody, oType) {
+    build(oArgs, oReturn, oBody, oType) {
         args = oArgs;
+        returnType = oReturn;
         body = oBody;
         funcType = oType;
 
@@ -47,12 +49,28 @@ class FuncNode <- Node {
         return npvec.vec(body);
     }
 
+    func pub getAsType() {
+        const typeArgs = npvec.vec();
+        for (let i = 0; i < npvec.size(args); i += 1)
+            npvec.append(typeArgs, npvec.at(args, i).getType());
+        npvec.append(typeArgs, returnType);
+        return UnresolvedType(
+            npvec.vec("function"),
+            typeArgs,
+            false
+        );
+    }
+
     func pub getFuncType() {
         return funcType;
     }
 
     func pub getArgs() {
         return args;
+    }
+
+    func pub getReturnType() {
+        return returnType;
     }
 
     func pub getBody() {
@@ -62,10 +80,10 @@ class FuncNode <- Node {
     func def string() {
         let res = "Func(";
         for (let i = 0; i < npvec.size(args); i += 1)
-            res += npvec.at(args, i) + ", ";
+            res += std.asString(npvec.at(args, i)) + ", ";
         if (npvec.size(args) > 0)
             res = std.slice(res, 0, -3);
-        return res + ")";
+        return res + ", " + std.asString(body) + ")";
     }
 }
 

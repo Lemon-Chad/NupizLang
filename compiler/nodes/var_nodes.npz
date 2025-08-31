@@ -5,9 +5,11 @@ class DeclareGlobalNode <- Node {
     let prv name;
     let prv val;
     let prv isConstant;
+    let prv varType;
 
-    build(oName, oVal, oIsConstant) {
+    build(oName, oType, oVal, oIsConstant) {
         name = oName;
+        varType = oType;
         val = oVal;
         isConstant = oIsConstant;
 
@@ -22,6 +24,10 @@ class DeclareGlobalNode <- Node {
         return name;
     }
 
+    func pub getVarType() {
+        return varType;
+    }
+
     func pub getConstant() {
         return isConstant;
     }
@@ -32,7 +38,8 @@ class DeclareGlobalNode <- Node {
 
     func def string() {
         return "DeclareGlobal('" + name + 
-            "', " + std.asString(val) + ")";
+            "': " + std.asString(varType) + 
+            ", " + std.asString(val) + ")";
     }
 }
 
@@ -91,9 +98,11 @@ class DeclareLocalNode <- Node {
     let prv name;
     let prv val;
     let prv isConstant;
+    let prv varType;
 
-    build(oName, oVal, oIsConstant) {
+    build(oName, oType, oVal, oIsConstant) {
         name = oName;
+        varType = oType;
         val = oVal;
         isConstant = oIsConstant;
 
@@ -102,6 +111,10 @@ class DeclareLocalNode <- Node {
 
     func getChildren() {
         return npvec.vec(val);
+    }
+
+    func pub getVarType() {
+        return varType;
     }
 
     func pub getName() {
@@ -118,7 +131,8 @@ class DeclareLocalNode <- Node {
 
     func def string() {
         return "DeclareLocal('" + name + 
-            "', " + std.asString(val) + ")";
+            "': " + std.asString(varType) + 
+            ", " + std.asString(val) + ")";
     }
 }
 

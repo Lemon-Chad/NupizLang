@@ -1131,8 +1131,8 @@ class Parser {
             return res;
         if (!match(TokenType.SEMICOLON, null))
             return res.failure(Error.ExpectedCharError(
-                current.filename, current.src,
-                current.idx, current.len,
+                previous.filename, previous.src,
+                previous.idx, previous.len,
                 "Expected ';' after expression."
             ));
         res.advance();

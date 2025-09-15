@@ -329,7 +329,7 @@ class Lexer {
                 return false;
         }
 
-        addToken(TokenType.EOF, "[EOF]");
+        addToken(TokenType.EOF, "\r");
 
         return !hasError();
     }

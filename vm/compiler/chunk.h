@@ -55,6 +55,7 @@ typedef enum {
     OP_UNPACK,
     OP_ATTRIBUTE,
     OP_IMPORT_FILE,
+    OP_THROW,
 } OpCode;
 
 struct Chunk {

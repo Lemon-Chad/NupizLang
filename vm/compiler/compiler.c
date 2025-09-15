@@ -496,10 +496,10 @@ static void function(Parser* parser, FunctionType type) {
 }
 
 static void funDeclaration(Parser* parser) {
-  uint8_t global = parseVariable(parser, "Expect function name.", false);
-  markInitialized(parser);
-  function(parser, FUNC_FUNCTION);
-  defineVariable(parser, global);
+    uint8_t global = parseVariable(parser, "Expect function name.", false);
+    markInitialized(parser);
+    function(parser, FUNC_FUNCTION);
+    defineVariable(parser, global);
 }
 
 static void endScope(Parser* parser) {

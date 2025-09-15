@@ -597,7 +597,7 @@ InterpretResult run(VM* vm) {
             case OP_ADD:
                 if (IS_STRING(peek(vm, 0)) && IS_STRING(peek(vm, 1))) {
                     concatenate(vm);
-                } else if (IS_LIST(peek(vm, 0)) && IS_LIST(peek(vm, 0))) {
+                } else if (IS_LIST(peek(vm, 0)) && IS_LIST(peek(vm, 1))) {
                     addLists(vm);
                 } else if (IS_NUMBER(peek(vm, 0)) && IS_NUMBER(peek(vm, 1))) {
                     double b = AS_NUMBER(pop(vm));
@@ -1110,6 +1110,17 @@ InterpretResult run(VM* vm) {
                 }
 
                 break;
+            }
+
+            case OP_THROW: {
+                Value val = peek(vm, 0);
+                if (!IS_STRING(val)) {
+                    runtimeError(vm, "'throw' statement requires a string.");
+                    return INTERPRET_RUNTIME_ERR;
+                }
+
+                runtimeError(vm, AS_CSTRING(val));
+                return INTERPRET_RUNTIME_ERR;
             }
         }
     }

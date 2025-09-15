@@ -385,6 +385,9 @@ class Compiler {
 
             endScope();
         } 
+        else if (nodeType == NodeType.PACKAGE) {
+            compileNode(node.getBody());
+        }
 
         // Literals
         else if (nodeType == NodeType.NUMBER) {
@@ -502,6 +505,9 @@ class Compiler {
 
             emitConstant(Value.Function(function), node.getLine());
             emitByte(OpCode.IMPORT_FILE, node.getLine());
+        }
+        else if (nodeType == NodeType.CAST) {
+            compileNode(node.getNode());
         }
         
         // Variable Nodes

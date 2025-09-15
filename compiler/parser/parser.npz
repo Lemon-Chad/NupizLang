@@ -19,7 +19,7 @@ unpack import "../nodes/class_nodes.npz";
 
 unpack import "../compiler/op_codes.npz";
 
-unpack import "../typing/types.npz";
+unpack import "../typing/unresolved_types.npz";
 
 class Precedence {
     const pub static NONE           =  0;
@@ -36,9 +36,11 @@ class Precedence {
 }
 
 class Parser {
-    const prv staticTyping = false;
+    const pub static STATIC_TYPING = true;
+    
     const prv debug = false;
 
+    let prv packagePath;
     let prv path;
 
     let prv previous;
@@ -89,7 +91,8 @@ class Parser {
             TokenType.AND,              [null,      and,    Precedence.AND],
             TokenType.KEYWORD,          [keyword,   null,   Precedence.NONE],
             TokenType.OR,               [null,      or,     Precedence.OR],
-            TokenType.LBRACKET,         [list,      index,  Precedence.CALL]
+            TokenType.LBRACKET,         [list,      index,  Precedence.CALL],
+            TokenType.RIGHT_ARROW,      [null,      cast,   Precedence.PRIMARY]
         );
 
         loopDepth = 0;
@@ -172,7 +175,9 @@ class Parser {
         const res = ParseResult();
         const nodes = npvec.vec();
 
-        const ast = BodyNode(nodes);
+        packagePath = npvec.vec();
+
+        const ast = PackageNode(packagePath, BodyNode(nodes));
         npmap.emplace(importedASTs, path, ast);
 
         const start = current;
@@ -181,7 +186,8 @@ class Parser {
             const node = res.register(declaration());
             if (res.hasError())
                 return res;
-            npvec.append(nodes, node);
+            if (node != null)
+                npvec.append(nodes, node);
         }
 
         if (current.tokenType != TokenType.EOF) {
@@ -199,12 +205,45 @@ class Parser {
 
     func prv declaration() {
         const res = ParseResult();
-        if (match(TokenType.KEYWORD, "var") || 
+        if (match(TokenType.KEYWORD, "pack")) {
+            res.advance();
+            if (npvec.size(packagePath) > 0)
+                return res.failure(Error.InvalidSyntax(
+                    previous.filename, previous.idx,
+                    previous.src, previous.len,
+                    "Package path already defined."
+                ));
+            
+            while (true) {
+                if (!match(TokenType.IDENTIFIER, null))
+                    return res.failure(Error.InvalidSyntax(
+                        current.filename, current.src,
+                        current.idx, current.len,
+                        "Expected type name or path."
+                    ));
+                res.advance();
+                npvec.append(packagePath, previous.text);
+                
+                if (!match(TokenType.DOT, null))
+                    break;
+                res.advance();
+            }
+
+            if (!match(TokenType.SEMICOLON, null))
+                return res.failure(Error.ExpectedCharError(
+                    current.filename, current.src,
+                    current.idx, current.len,
+                    "Expected ';' after pack statement."
+                ));
+            res.advance();
+            return res.success(null);
+        } else if (match(TokenType.KEYWORD, "var") || 
                 match(TokenType.KEYWORD, "let") || 
                 match(TokenType.KEYWORD, "const")) {
             res.advance();
             const isConstant = previous.text == "const";
-            const node = res.register(varDeclaration(isConstant));
+            const typeInfer = isConstant || previous.text == "let";
+            const node = res.register(varDeclaration(isConstant, typeInfer));
             if (res.hasError())
                 return res;
             return res.success(node);
@@ -253,7 +292,7 @@ class Parser {
         return res.success(name);
     }
 
-    func prv varDeclaration(isConstant) {
+    func prv varDeclaration(isConstant, typeInfer) {
         const res = ParseResult();
 
         const start = previous;
@@ -262,7 +301,11 @@ class Parser {
         if (res.hasError())
             return res;
         
-        const type = res.register(parseHint(TokenType.COLON, "Expected ':' after variable name."));
+        const type = res.register(parseHint(
+            TokenType.COLON, 
+            "Expected ':' after variable name.", 
+            typeInfer
+        ));
         if (res.hasError())
             return res;
 
@@ -298,7 +341,8 @@ class Parser {
             const node = res.register(declaration());
             if (res.hasError())
                 return res;
-            npvec.append(nodes, node);
+            if (node != null)
+                npvec.append(nodes, node);
         }
 
         if (!match(TokenType.RBRACE, null))
@@ -315,16 +359,18 @@ class Parser {
         );        
     }
     
-    func prv parseHint(token, msg) {
+    func prv parseHint(token, msg, optional) {
         const res = ParseResult();
-        if (!staticTyping) return res.success(null);
 
-        if (!match(token, null))
+        if (!match(token, null)) {
+            if (optional || !Parser.STATIC_TYPING) 
+                return res.success(null);
             return res.failure(Error.InvalidSyntax(
                 current.filename, current.src,
                 current.idx, current.len,
                 msg
             ));
+        }
         res.advance();
         
         const type = res.register(parseType());
@@ -335,7 +381,59 @@ class Parser {
 
     func prv parseType() {
         const res = ParseResult();
-        if (!staticTyping) return res.success(null); 
+        if (!Parser.STATIC_TYPING) return res.success(null); 
+
+        if (match(TokenType.LPAREN, null)) {
+            res.advance();
+
+            const returnType = res.register(parseType());
+            if (res.hasError())
+                return res;
+            if (!match(TokenType.RPAREN, null))
+                return res.failure(Error.ExpectedCharError(
+                    current.filename, current.src,
+                    current.idx, current.len,
+                    "Expected ')' after return type for a function type."
+                ));
+            res.advance();
+
+            if (!match(TokenType.LPAREN, null))
+                return res.failure(Error.ExpectedCharError(
+                    current.filename, current.src,
+                    current.idx, current.len,
+                    "Expected '(' before argument types for a function type."
+                ));
+            res.advance();
+
+            const funcArgs = npvec.vec();
+            while (current.tokenType != TokenType.RPAREN) {
+                const argType = res.register(parseType());
+                if (res.hasError())
+                    return res;
+                npvec.append(funcArgs, argType);
+
+                if (!match(TokenType.COMMA, null))
+                    break;
+                res.advance();
+            }
+
+            if (!match(TokenType.RPAREN, null))
+                return res.failure(Error.ExpectedCharError(
+                    current.filename, current.src,
+                    current.idx, current.len,
+                    "Expected ')' after function type arguments."
+                ));
+            res.advance();
+
+            npvec.append(funcArgs, returnType);
+            let nullable = false;
+            if (match(TokenType.QUESTION_MARK, null)) {
+                res.advance();
+                nullable = true;
+            }
+
+            return res.success(UnresolvedType(npvec.vec("function"), funcArgs, nullable));
+        }
 
         const path = npvec.vec();
         while (true) {
@@ -386,7 +484,7 @@ class Parser {
         return res.success(UnresolvedType(path, args, nullable));
     }
 
-    func prv function(funcType) {
+    func prv function(funcType, isStatement) {
         const res = ParseResult();
 
         beginScope();
@@ -413,7 +511,8 @@ class Parser {
             
             const typeName = res.register(parseHint(
                 TokenType.COLON, 
-                "Expected ':' after parameter declaration."
+                "Expected ':' after parameter declaration.",
+                false
             ));
             if (res.hasError())
                 return res;
@@ -438,7 +537,7 @@ class Parser {
             npvec.vec("void"), npvec.vec(), 
             false
         );
-        if (staticTyping && match(TokenType.RIGHT_ARROW, null)) {
+        if (Parser.STATIC_TYPING && match(TokenType.RIGHT_ARROW, null)) {
             res.advance();
             returnType = res.register(parseType());
             if (res.hasError())
@@ -448,7 +547,12 @@ class Parser {
         if (match(TokenType.BIG_ARROW, null)) {
             res.advance();
 
-            const returnValue = res.register(expressionStatement());
+            let returnValue;
+            if (isStatement)
+                returnValue = res.register(expressionStatement());
+            else
+                returnValue = res.register(expression());
+            
             if (res.hasError())
                 return res;
             returnValue.emitPop = false;
@@ -490,7 +594,7 @@ class Parser {
         if (res.hasError())
             return res;
         
-        const fn = res.register(function(FuncType.FUNCTION));
+        const fn = res.register(function(FuncType.FUNCTION, true));
         if (res.hasError())
             return res;
         fn.tokSource(start, previous);
@@ -510,6 +614,7 @@ class Parser {
         const start = previous;
         
         const isConstant = previous.text == "const";
+        const typeInfer = isConstant || previous.text == "let";
 
         let isStatic = false;
         let isPrivate = true;
@@ -590,7 +695,7 @@ class Parser {
                 "Unknown default method '" + name + "'."
             ));
 
-        const fn = res.register(function(FuncType.METHOD));
+        const fn = res.register(function(FuncType.METHOD, true));
         if (res.hasError())
             return res;
         
@@ -605,7 +710,7 @@ class Parser {
     func prv parseBuilder() {
         const res = ParseResult();
         const start = previous;
-        const fn = res.register(function(FuncType.BUILDER));
+        const fn = res.register(function(FuncType.BUILDER, true));
         if (res.hasError())
             return res;
         fn.tokSource(start, previous);
@@ -879,7 +984,8 @@ class Parser {
         let initializer;
         if (match(TokenType.KEYWORD, "var") || match(TokenType.KEYWORD, "let")) {
             res.advance();
-            initializer = res.register(varDeclaration(false));
+            const typeInfer = previous.text == "let";
+            initializer = res.register(varDeclaration(false, typeInfer));
         } else if (!match(TokenType.SEMICOLON, null)) {
             initializer = res.register(expressionStatement());
         } else {
@@ -994,6 +1100,18 @@ class Parser {
             if (res.hasError())
                 return res;
             endScope();
+            return res.success(node);
+        } else if (match(TokenType.KEYWORD, "throw")) {
+            res.advance();
+            const node = res.register(unary(false));
+            if (res.hasError())
+                return res;
+            if (!match(TokenType.SEMICOLON, null))
+                return res.failure(Error.ExpectedCharError(
+                    current.filename, current.src,
+                    current.idx, current.len,
+                    "Expected ';' after throw statement."
+                ));
             return res.success(node);
         } else {
             return expressionStatement();
@@ -1195,6 +1313,8 @@ class Parser {
             opcode = OpCode.NOT;
         else if (tok.tokenType == TokenType.KEYWORD && tok.text == "unpack")
             opcode = OpCode.UNPACK;
+        else if (tok.tokenType == TokenType.KEYWORD && tok.text == "throw")
+            opcode = OpCode.THROW;
         
         return res.success(
             UnaryNode(node, opcode).tokSource(tok, previous)
@@ -1454,6 +1574,12 @@ class Parser {
             if (res.hasError())
                 return res;
             return res.success(node);
+        } else if (tok.text == "func") {
+            const fn = res.register(function(FuncType.FUNCTION, false));
+            if (res.hasError())
+                return res;
+            fn.tokSource(tok, previous);
+            return res.success(fn);
         }
 
         return res.failure(Error.InvalidSyntax(
@@ -1532,6 +1658,19 @@ class Parser {
         return ParseResult().success(
             NumberNode(std.strtod(previous.text)).tokSource(previous, previous)
         );
+    }
+
+    func prv cast(left, canAssign) {
+        const res = ParseResult();
+
+        const castType = res.register(parseType());
+        if (res.hasError())
+            return res;
+        
+        return res.success(CastNode(left, castType).setSource(
+            left.filename, left.src, left.idx,
+            previous.idx + previous.len - left.idx
+        ));
     }
 
 }

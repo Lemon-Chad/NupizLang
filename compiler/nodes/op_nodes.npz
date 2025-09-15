@@ -403,3 +403,31 @@ class ImportFileNode <- Node {
         return "Import('" + path + "')";
     }
 }
+
+class CastNode <- Node {
+    let prv node;
+    let prv unresolved;
+
+    build(oNode, oType) {
+        node = oNode;
+        unresolved = oType;
+
+        type = NodeType.CAST;
+    }
+
+    func getChildren() {
+        return npvec.vec(node);
+    }
+
+    func pub getNode() {
+        return node;
+    }
+    
+    func pub getCastType() {
+        return unresolved;
+    }
+
+    func def string() {
+        return "(" + std.asString(unresolved) + ")(" + std.asString(node) + ")";
+    }
+}

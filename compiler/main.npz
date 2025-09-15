@@ -11,6 +11,26 @@ const dumperPkg = import "./dumper/dumper.npz";
 const formatPkg = import "./util/formatting.npz";
 const resPkg = import "./parser/result.npz";
 
+const packagerPkg = import "./typing/type_packager.npz";
+const checkerPkg = import "./typing/type_checker.npz";
+
+func typeSafety(ast) {
+    const packager = packagerPkg.Packager();
+    packager.generatePackages(ast);
+
+    const root = packagerPkg.Packager.getRoot();
+
+    const checker = checkerPkg.TypeChecker(root);
+    const res = checker.check(ast);
+
+    if (res.hasError()) {
+        res.printErrors();
+        return false;
+    }
+
+    return true;
+}
+
 func main(args) {
     let inputFile;
     let outputFile;
@@ -83,6 +103,12 @@ func main(args) {
     if (res.hasError()) {
         res.printError();
         return;
+    }
+
+    // Static typing
+    if (parserPkg.Parser.STATIC_TYPING) {
+        if (!typeSafety(res.val))
+            return;
     }
 
     const compiler = compilerPkg.Compiler(absPath, compilerPkg.FuncType.SCRIPT);

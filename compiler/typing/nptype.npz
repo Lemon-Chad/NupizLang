@@ -1,0 +1,564 @@
+import std;
+import npmap;
+
+unpack import "../compiler/op_codes.npz";
+
+class TypeOperations {
+    const pub static PLUS           =  0;
+    const pub static MINUS          =  1;
+    const pub static STAR           =  2;
+    const pub static SLASH          =  3;
+    const pub static EQUAL          =  4;
+    const pub static COMPARE        =  5;
+    const pub static BANG           =  6;
+    const pub static NEGATE         =  7;
+    const pub static CALL           =  8;
+    const pub static GET            =  9;
+    const pub static SET            = 10;
+    const pub static IDX            = 11;
+    const pub static SET_IDX        = 12;
+    const pub static UNPACK         = 13;
+    const pub static THROW          = 14;
+
+    func pub static fromOpcode(opcode) {
+        const opcodeMap = npmap.map(
+            OpCode.ADD,             TypeOperations.PLUS,
+            OpCode.SUBTRACT,        TypeOperations.MINUS,
+            OpCode.MULTIPLY,        TypeOperations.STAR,
+            OpCode.DIVIDE,          TypeOperations.SLASH,
+            OpCode.EQUAL,           TypeOperations.EQUAL,
+            OpCode.NOT_EQUAL,       TypeOperations.EQUAL,
+            OpCode.GREATER,         TypeOperations.COMPARE,
+            OpCode.GREATER_EQUAL,   TypeOperations.COMPARE,
+            OpCode.LESS,            TypeOperations.COMPARE,
+            OpCode.LESS_EQUAL,      TypeOperations.COMPARE,
+            OpCode.GET_INDEX,       TypeOperations.IDX,
+            OpCode.NOT,             TypeOperations.BANG,
+            OpCode.NEGATE,          TypeOperations.NEGATE,
+            OpCode.UNPACK,          TypeOperations.UNPACK,
+            OpCode.THROW,           TypeOperations.THROW
+        );
+        
+        if (!npmap.has(opcodeMap, opcode))
+            return -1;
+        return npmap.get(opcodeMap, opcode);
+    }
+
+    func pub static toString(opcode) {
+        const opcodeMap = npmap.map(
+            TypeOperations.PLUS,        "+",
+            TypeOperations.MINUS,       "-",
+            TypeOperations.STAR,        "*",
+            TypeOperations.SLASH,       "/",
+            TypeOperations.EQUAL,       "eq",
+            TypeOperations.COMPARE,     "comp",
+            TypeOperations.IDX,         "index",
+            TypeOperations.BANG,        "!",
+            TypeOperations.NEGATE,      "-",
+            TypeOperations.UNPACK,      "unpack",
+            TypeOperations.THROW,       "throw"
+        );
+        
+        if (!npmap.has(opcodeMap, opcode))
+            return -1;
+        return npmap.get(opcodeMap, opcode);
+    }
+}
+
+class NPType {
+    const pub static ERROR      = -1;
+    const pub static VOID       =  0; // [x] Implement void type literal
+    const pub static ANY        =  1; // [x] Implement any type literal
+    const pub static NUMBER     =  2; // [x] Implement number type literal
+    const pub static STRING     =  3; // [x] Implement string type literal
+    const pub static BOOLEAN    =  4; // [x] Implement boolean type literal
+    const pub static LIST       =  5; // [x] Implement list type class
+    const pub static FUNCTION   =  6; // [x] Implement function type class
+    const pub static POINTER    =  7; // [ ] Implement pointer type classes
+    const pub static OPTIONAL   =  8; // [x] Implement optional type class
+    const pub static IDENTIFIER =  9;
+
+    // POINTER type represents any
+    // object that has varying operations.
+
+    // IDENTIFIER is a helper psuedotype for
+    // operations such as GET and SET
+    // i.e. instance.hello = 4;
+    // ( InstanceType.operation(SET) )(IDENTIFIER("hello"), 4)
+    
+    // ERROR is a helper psuedotype for
+    // returning errors from NPType functions
+
+    // Each type has defined set of operations
+    // and their return values.
+
+    func pub static binaryOperation(in, out) {
+        func lambda(argv, argc) {
+            if (argc != 1)
+                return NPError(
+                    "Missing Operand",
+                    "Expected 1 operand, got " + std.asString(argc) + "." 
+                );
+            if (npvec.at(argv, 0) != in)
+                return NPError(
+                    "Type Mismatch",
+                    "Expected '" + std.asString(in) + 
+                    "', got '" + std.asString(npvec.at(argv, 0)) + "'."
+                );
+            return out;
+        }
+
+        return lambda;
+    }
+    
+    func pub static unaryOperation(out) {
+        func lambda(argv, argc) {
+            if (argc != 0)
+                return NPError(
+                    "Unexpected Operand",
+                    "Expected no operands."
+                );
+            return out;
+        }
+
+        return lambda;
+    }
+
+    func pub static ternaryOperation(in1, in2, out) {
+        func lambda(argv, argc) {
+            if (argc != 2)
+                return NPError(
+                    "Missing Operand",
+                    "Expected 2 operands, got " + std.asString(argc) + "."
+                );
+            if (npvec.at(argv, 0) != in1)
+                return NPError(
+                    "Type Mismatch",
+                    "Expected '" + std.asString(in1) + 
+                    "', got '" + std.asString(npvec.at(argv, 0)) + "'."
+                );
+            if (npvec.at(argv, 1) != in2)
+                return NPError(
+                    "Type Mismatch",
+                    "Expected '" + std.asString(in2) + 
+                    "', got '" + std.asString(npvec.at(argv, 1)) + "'."
+                );
+            return out;
+        }
+
+        return lambda;
+    }
+
+    let pub ownerPackage;
+    let pub name;
+    let pub type;
+
+    let prv parent;
+    let prv operations;
+
+    // type signature of operation is
+    // NPType(npvec.vec<NPType>, num)
+    // func operation(argv: npvec.vec<NPType>, argc: num) -> NPType
+
+    func pub operation(opcode) {
+        if (!npmap.has(operations, opcode)) {
+            func lambda(argv, argc) {
+                return NPError(
+                    "Unsupported Operation",
+                    "Type '" + std.asString(this) +
+                    "' does not support '" + TypeOperations.toString(opcode)
+                    + "' operations."
+                );
+            }
+
+            return lambda;
+        }
+        return npmap.get(operations, opcode);
+    }
+
+    func pub canUpcast(other) {
+        if (other.type == NPType.ANY)
+            return true;
+        
+        if (this == other)
+            return true;
+
+        if (parent != null)
+            return parent.canUpcast(other);
+        return false;
+    }
+
+    func def eq(other) {
+        if (ownerPackage != other.ownerPackage)
+            return false;
+        if (name != other.name)
+            return false;
+        if (type != other.type)
+            return false;
+        return true;
+    }
+
+    func def string() {
+        if (ownerPackage == null)
+            return name;
+        return std.asString(ownerPackage) + "." + name;
+    }
+}
+
+class NPIdentifier <- NPType {
+    build(ident) {
+        name = ident;
+        type = NPType.IDENTIFIER;
+
+        operations = npmap.map();
+    }
+
+    func pub canUpcast(other) {
+        return false;
+    }
+}
+
+class NPError <- NPType {
+    let pub desc;
+
+    build(name, desc) {
+        this.name = name;
+        this.desc = desc;
+
+        type = NPType.ERROR;
+
+        operations = npmap.map();
+    }
+
+    func pub canUpcast(other) {
+        return false;
+    }
+}
+
+// Literals
+
+class NPVoid <- NPType {
+    build() {
+        ownerPackage = null;
+        name = "void";
+        type = NPType.VOID;
+        operations = npmap.map();
+    }
+
+    func pub canUpcast(other) {
+        if (other.type == NPType.ANY)
+            return true;
+        if (other.type == NPType.OPTIONAL)
+            return true;
+        if (other.type == NPType.VOID)
+            return true;
+        return false;
+    }
+
+    let pub static INSTANCE = null;
+
+    func pub static get() {
+        if (INSTANCE == null)
+            set();
+        return INSTANCE;
+    }
+
+    func pub static set() {
+        INSTANCE = NPVoid();
+    }
+}
+
+class NPAny <- NPType {
+    build() {
+        name = "any";
+        type = NPType.ANY;
+    }
+
+    func pub operation(opcode) {
+        func returnAny(argv, argc) {
+            if (opcode == TypeOperations.EQUAL || opcode == TypeOperations.COMPARE)
+                return NPBoolean.get();
+            
+            return NPAny.get();
+        }
+        return returnAny;
+    }
+
+    let pub static INSTANCE = null;
+
+    func pub static get() {
+        if (INSTANCE == null)
+            set();
+        return INSTANCE;
+    }
+
+    func pub static set() {
+        INSTANCE = NPAny();
+    }
+}
+
+class NPNumber <- NPType {
+    build() {
+        name = "num";
+        type = NPType.NUMBER;
+
+        const arithmetic = NPType.binaryOperation(this, this);
+        const comparison = NPType.binaryOperation(this, NPBoolean.get());
+
+        operations = npmap.map(
+            TypeOperations.PLUS,    arithmetic,
+            TypeOperations.MINUS,   arithmetic,
+            TypeOperations.STAR,    arithmetic,
+            TypeOperations.SLASH,   arithmetic,
+            TypeOperations.EQUAL,   comparison,
+            TypeOperations.COMPARE, comparison,
+            TypeOperations.NEGATE,  NPType.unaryOperation(this)
+        );
+    }
+
+    let pub static INSTANCE = null;
+
+    func pub static get() {
+        if (INSTANCE == null)
+            set();
+        return INSTANCE;
+    }
+
+    func pub static set() {
+        INSTANCE = NPNumber();
+    }
+}
+
+class NPString <- NPType {
+    build() {
+        name = "string";
+        type = NPType.STRING;
+
+        operations = npmap.map(
+            TypeOperations.PLUS,    NPType.binaryOperation(this, this),
+            TypeOperations.IDX,     NPType.binaryOperation(NPNumber.get(), this),
+            TypeOperations.EQUAL,   NPType.binaryOperation(this, NPBoolean.get()),
+            TypeOperations.THROW,   NPType.unaryOperation(NPVoid.get())
+        );
+    }
+
+    let pub static INSTANCE = null;
+
+    func pub static get() {
+        if (INSTANCE == null)
+            set();
+        return INSTANCE;
+    }
+
+    func pub static set() {
+        INSTANCE = NPString();
+    }
+}
+
+class NPBoolean <- NPType {
+    build() {
+        name = "bool";
+        type = NPType.BOOLEAN;
+
+        operations = npmap.map(
+            TypeOperations.EQUAL,   NPType.binaryOperation(this, this),
+            TypeOperations.BANG,    NPType.unaryOperation(this)
+        );
+    }
+
+    let pub static INSTANCE = null;
+
+    func pub static get() {
+        if (INSTANCE == null)
+            set();
+        return INSTANCE;
+    }
+
+    func pub static set() {
+        INSTANCE = NPBoolean();
+    }
+}
+
+// Type classes
+
+class NPOptional <- NPType {
+    let pub subtype;
+
+    build(subtype) {
+        name = "optional";
+        type = NPType.OPTIONAL;
+
+        this.subtype = subtype;
+
+        operations = npmap.map(
+            TypeOperations.EQUAL, NPType.binaryOperation(this, NPBoolean.get())
+        );
+    }
+
+    func pub canUpcast(other) {
+        if (other.type == NPType.ANY)
+            return true;
+        
+        if (other.type != NPType.OPTIONAL)
+            return false;
+        
+        return subtype.canUpcast(other.subtype);
+    }
+
+    func def eq(other) {
+        if (other.type != NPType.OPTIONAL)
+            return false;
+        return other.subtype == subtype;
+    }
+}
+
+class NPList <- NPType {
+    let pub subtype;
+
+    build(subtype) {
+        name = "list";
+        type = NPType.LIST;
+
+        this.subtype = subtype;
+
+        operations = npmap.map(
+            TypeOperations.PLUS,    NPType.binaryOperation(this, this),
+            TypeOperations.IDX,     NPType.binaryOperation(NPNumber.get(), subtype),
+            TypeOperations.SET_IDX, NPType.ternaryOperation(NPNumber.get(), subtype, subtype),
+            TypeOperations.EQUAL,   NPType.binaryOperation(this, NPBoolean.get())
+        );
+    }
+
+    func pub canUpcast(other) {
+        if (other.type == NPType.ANY)
+            return true;
+        
+        if (other.type != NPType.LIST)
+            return false;
+        
+        return subtype.canUpcast(other.subtype);
+    }
+
+    func def eq(other) {
+        if (other.type != NPType.LIST)
+            return false;
+        return other.subtype == subtype;
+    }
+
+    func def string() {
+        return "list<" + std.asString(subtype) + ">";
+    }
+}
+
+class NPFunction <- NPType {
+    let pub subtypes;
+
+    build(subtypes) {
+        name = "function";
+        type = NPType.FUNCTION;
+
+        this.subtypes = subtypes;
+        // [ argType1, argType2, ..., returnType ]
+
+        operations = npmap.map(
+            TypeOperations.CALL, this.call
+        );
+    }
+
+    func call(argv, argc) {
+        if (argc != npvec.size(subtypes) - 1)
+            return NPError(
+                "Argument Count",
+                "Expected " + std.asString(npvec.size(subtypes) - 1) + 
+                " arguments, got " + std.asString(argc) + "."
+            );
+        for (let i = 0; i < npvec.size(subtypes) - 1; i += 1)
+            if (!npvec.at(argv, i).canUpcast(npvec.at(subtypes, i)))
+                return NPError(
+                    "Type Mismatch",
+                    "Expected '" + std.asString(npvec.at(subtypes, i)) + 
+                    "' for argument " + std.asString(i + 1) + ", got '" +
+                    std.asString(npvec.at(argv, i)) + "'."
+                );
+        return npvec.at(subtypes, -1);
+    }
+
+    func canUpcast(other) {
+        if (other.type == NPType.ANY)
+            return true;
+        
+        if (other.type != NPType.Function)
+            return false;
+        if (npvec.size(subtypes) != npvec.size(other.subtypes))
+            return false;
+        for (let i = 0; i < npvec.size(subtypes); i += 1)
+            if (!npvec.at(subtypes, i).canUpcast(npvec.at(other.subtypes, i)))
+                return false;
+        return true;
+    }
+
+    func def eq(other) {
+        if (other.type != NPType.Function)
+            return false;
+        if (npvec.size(subtypes) != npvec.size(other.subtypes))
+            return false;
+        for (let i = 0; i < npvec.size(subtypes); i += 1)
+            if (npvec.at(subtypes, i) != npvec.at(other.subtypes, i))
+                return false;
+        return true;
+    }
+
+    func def string() {
+        let res = "(" + npvec.at(subtypes, -1) + ")" + "(";
+        for (let i = 0; i < npvec.size(subtypes) - 1; i += 1)
+            res += std.asString(npvec.at(subtypes, i)) + ", ";
+        
+        if (npvec.size(subtypes) > 1)
+            res = std.slice(res, 0, -3);
+        return res + ")";
+    }
+}
+
+// Pointed types
+
+// TODO:
+// [ ] Pointer base class
+// [ ] Class type class (class*Box, class*Person, etc.)
+// [ ] Instance type class (Box, Person, etc.)
+// [ ] Namespace type class (import "./personPkg.npz";)
+// [ ] Library type class (import std;)
+// [ ] Library pointer objects (iofile.FilePointer, npvec.Vector, etc.)
+
+class NPPointer <- NPType {
+    let pub fields;
+    let pub methods;
+
+    let pub incompleteFields;
+    let pub incompleteMethods;
+
+    let pub complete;
+
+    build(name) {
+        this.name = name;
+
+        fields = npmap.map();
+        methods = npmap.map();
+
+        incompleteFields = npmap.map();
+        incompleteMethods = npmap.map();
+
+        complete = false;
+    }
+}
+
+// Type {
+//  name: String
+//  type: NPTypeIndex
+//  parent?: NPType
+//  operations: Map<TypeOperations, Operation(argv, argc)>
+//
+//  func operation(opcode)? -> Operation(argv, argc)?
+//      Returns the function (or null) of the given operation.
+//  func canUpcast(other)? -> true | false
+//      Whether the current type can be upcasted to the other type.
+//}

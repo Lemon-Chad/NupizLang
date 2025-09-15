@@ -1,0 +1,178 @@
+import std;
+import npmap;
+import npvec;
+
+const nptypes = import "./nptype.npz";
+
+class Package {
+    let pub path;
+    let pub types;
+    let pub packages;
+    let pub parent;
+
+    build(path) {
+        this.path = path;
+        this.types = npmap.map();
+        this.packages = npmap.map();
+    }
+
+    func pub getPackage(packagePath) {
+        // Always search from root
+        if (parent != null)
+            return parent.getPackage(packagePath);
+        return _getPackage(packagePath, 0);
+    }
+
+    func pub _getPackage(packagePath, depth) {
+        if (depth >= npvec.size(packagePath))
+            return this;
+        
+        const p = npvec.at(packagePath, depth);
+
+        if (!npmap.has(packages, p)) {
+            const pack = Package(p);
+            pack.parent = this;
+
+            npmap.emplace(packages, p, pack);
+        }
+
+        const pack = npmap.get(packages, p);
+        if (depth + 1 == npvec.size(packagePath))
+            return pack;
+        return pack._getPackage(packagePath, depth + 1);
+    }
+
+    func pub getRoot() {
+        if (parent != null)
+            return parent.getRoot();
+        return this;
+    }
+
+    // Add a new NPType to the current package.
+    func pub addType(type) {
+        return npmap.emplace(type.name, type);
+    }
+
+    // Lookup a type given an
+    // unresolved type.
+    func pub typeLookup(unres) {
+        // Always search from root package downward.
+        if (parent != null)
+            return parent.typeLookup(unres);
+        
+        let res;
+        // Built-in types.
+        if (isBuiltin(unres)) {
+            const term = npvec.at(unres.path, 0);
+            if (term == "num")
+                res = nptypes.NPNumber.get();
+            else if (term == "void")
+                res = nptypes.NPVoid.get();
+            else if (term == "any")
+                res = nptypes.NPAny.get();
+            else if (term == "string")
+                res = nptypes.NPString.get();
+            else if (term == "bool")
+                res = nptypes.NPBoolean.get();
+            
+            // Built in type classes
+            else if (term == "function") {
+                if (npvec.size(unres.args) == 0)
+                    return nptypes.NPIdentifier("Function type does not have a return type.");
+                
+                const typedArgs = npvec.vec();
+                for (let i = 0; i < npvec.size(unres.args); i += 1) {
+                    const arg = typeLookup(npvec.at(unres.args, i));
+                    // Error
+                    if (arg.type == nptypes.NPType.IDENTIFIER)
+                        return arg;
+                    npvec.append(typedArgs, arg);
+                }
+                res = nptypes.NPFunction(typedArgs);
+            } 
+            else if (term == "list") {
+                if (npvec.size(unres.args) != 1)
+                    return nptypes.NPIdentifier("List type requires exactly one subtype.");
+                
+                const subtype = typeLookup(npvec.at(unres.args, 0));
+                if (subtype.type == nptypes.NPType.IDENTIFIER)
+                    return subtype;
+                res = nptypes.NPList(subtype);
+            }
+        }
+
+        // Custom defined types/incomplete types.
+        else {
+            const packagePath = npvec.vec();
+            const typeName = npvec.at(unres.path, -1);
+            for (let i = 0; i < npvec.size(unres.path) - 1; i += 1)
+                npvec.append(packagePath, npvec.at(unres.path, i));
+            
+            const pack = getPackage(packagePath);
+            
+            // If type is not yet defined,
+            // define an incomplete NPPointer type.
+            if (!npmap.has(pack.types, typeName)) {
+                const ptr = nptypes.NPPointer(typeName);
+                ptr.ownerPackage = pack;
+                npmap.emplace(pack.types, ptr);
+            }
+
+            res = npmap.get(pack.types, typeName);
+        }
+
+        // If nullable, wrap in the Optional type
+        if (unres.nullable) 
+            res = nptypes.NPOptional(res);
+        
+        return res;
+    }
+
+    func pub isBuiltin(unres) {
+        const builtin = npvec.vec(
+            "void",
+            "any",
+            "num",
+            "string",
+            "bool",
+            "list",
+            "function"
+        );
+
+        return npvec.size(unres.path) == 1 &&
+            npvec.find(builtin, npvec.at(unres.path, 0)) != -1;
+    }
+}
+
+class Packager {
+    let pub static ROOT_PACKAGE;
+
+    let prv package;
+
+    func pub generatePackages(packageNode) {
+        if (npvec.size(packageNode.getPath()) == 0)
+            package = Packager.getRoot();
+        else
+            package = Packager.getRoot().getPackage(packageNode.getPath());
+
+        visit(packageNode.getBody());
+
+        return package;
+    }
+
+    func prv visit(node) {
+
+    }
+
+    func pub static getRoot() {
+        setRoot();
+        return ROOT_PACKAGE;
+    }
+
+    func pub static setRoot() {
+        if (ROOT_PACKAGE != null)
+            return;
+        
+        ROOT_PACKAGE = Package("*root");
+    }
+}

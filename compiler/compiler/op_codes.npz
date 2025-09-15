@@ -49,6 +49,7 @@ class OpCode {
     const pub static UNPACK             = 46;
     const pub static ATTRIBUTE          = 47;
     const pub static IMPORT_FILE        = 48;
+    const pub static THROW              = 49;
 
     func pub static toString(opCode) {
         return [
@@ -100,7 +101,8 @@ class OpCode {
             "IMPORT",
             "UNPACK",
             "ATTRIBUTE",
-            "IMPORT_FILE"
+            "IMPORT_FILE",
+            "THROW"
         ][opCode];
     }
 }

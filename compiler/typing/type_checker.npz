@@ -1,0 +1,310 @@
+import std;
+import npvec;
+import npmap;
+
+unpack import "./nptype.npz";
+
+const packagerPkg = import "./type_packager.npz";
+
+const resPkg = import "../parser/result.npz";
+const Error = resPkg.Error;
+
+const nodePkg = import "../nodes/node.npz";
+const NodeType = nodePkg.NodeType;
+
+class TypeResult {
+    let pub errors;
+    let pub val;
+
+    let pub dependencies;
+
+    build() {
+        errors = npvec.vec();
+        val = null;
+
+        dependencies = npvec.vec();
+    }
+
+    func pub success(val) {
+        this.val = val;
+        return this;
+    }
+
+    func pub register(res) {
+        for (let i = 0; i < npvec.size(res.errors); i += 1)
+            npvec.append(errors, npvec.at(res.errors, i));
+        for (let i = 0; i < npvec.size(res.dependencies); i += 1)
+            npvec.append(dependencies, npvec.at(res.dependencies, i));
+        return res.val;
+    }
+
+    func pub hasError() {
+        return npvec.size(errors) > 0;
+    }
+
+    func pub addDependency(name) {
+        npvec.append(dependencies, name);
+    }
+
+    func pub hasDependencies() {
+        return npvec.size(dependencies) > 0;
+    }
+
+    func pub printErrors() {
+        for (let i = 0; i < npvec.size(errors); i += 1)
+            std.println(std.asString(npvec.at(errors, i)));
+    }
+
+    func pub failure(name, desc, node) {
+        const error = Error(
+            node.getFilename(), node.getSrc(),
+            node.getIdx(), node.getLen(),
+            name, desc
+        );
+        npvec.append(errors, error);
+
+        return this;
+    }
+
+    func pub typeFailure(type, node) {
+        return failure(type.name, type.desc, node);
+    }
+}
+
+class TypeChecker {
+    let prv rootPackage;
+
+    // Stack of scopes of current package
+    // Used for relative path packaging.
+    let prv packageStack;
+
+    // Global variable scopes
+    // Holds name: type
+    let prv globals;
+
+    // Stack of local variable scopes
+    // Holds [{ name: type }]
+    let prv localStack;
+    let prv scopeDepth;
+
+    // Holds all global variables that reference
+    // an unresolved global variables
+    // Such as:
+    //
+    // func add(x) => x + y;
+    // let y = 4;
+    //
+    // Since `y` was defined after `add`, `add` is held
+    // in unresolvedDependencies until `y` is defined.
+    //
+    // If `add` is called before `y` is defined, an exception
+    // will be raised.
+    //
+    // Once `y` is defined, `add` is re-type checked.
+    //
+    // Holds { name: dependency }
+
+    let prv unresolvedDependencies;
+
+    build(root) {
+        rootPackage = root;
+
+        packageStack = npvec.vec(npvec.vec());
+
+        globals = npmap.map();
+        localStack = npvec.vec();
+        scopeDepth = 0;
+        unresolvedDependencies = npmap.map();
+    }
+
+    func pub check(ast) {
+        return visit(ast);
+    }
+
+    func prv addRelativePath(path) {
+        // pack lemon.monad;
+        // class Box { ... }
+        // let x: Box = Box(4);
+        //
+        // Box -> lemon.monad.Box;
+
+        const newPath = npvec.vec();
+
+        const toPrepend = npvec.at(packageStack, -1);
+        for (let i = 0; i < npvec.size(toPrepend); i += 1)
+            npvec.append(newPath, npvec.at(toPrepend, i));
+        
+        for (let i = 0; i < npvec.size(path); i += 1)
+            npvec.append(newPath, npvec.at(path, i));
+        
+        return newPath;
+    }
+
+    func prv visit(node) {
+        return visitExpected(node, null);
+    }
+
+    func prv visitExpected(node, expected) {
+        const nodeType = node.getType();
+        if (nodeType == NodeType.PACKAGE) {
+            npvec.append(packageStack, node.getPath());
+            const res = visit(node.getBody());
+            npvec.pop(packageStack);
+
+            return res;
+        } 
+        else if (nodeType == NodeType.BODY) {
+            const res = TypeResult();
+            const nodes = node.getChildren();
+            for (let i = 0; i < npvec.size(nodes); i += 1)
+                res.register(visit(npvec.at(nodes, i)));
+            return res;
+        }
+
+        // Literals [ ]
+        else if (nodeType == NodeType.NUMBER) {
+            return TypeResult().success(NPNumber.get());
+        }
+        else if (nodeType == NodeType.BOOLEAN) {
+            std.println(std.asString(NPString.get()));
+            return TypeResult().success(NPBoolean.get());
+        }
+        else if (nodeType == NodeType.NULL) {
+            return TypeResult().success(NPVoid.get());
+        }
+        else if (nodeType == NodeType.STRING) {
+            return TypeResult().success(NPString.get());
+        }
+        else if (nodeType == NodeType.LIST) {
+            const res = TypeResult();
+
+            // Cases:
+            //
+            // Expected list type: list<subtype>
+            //  Check all elements to be able to be upcasted
+            //  to subtype.
+            //  If not, list<any>
+            //
+            // No list elements
+            //  Return list<any>
+            //
+            // List with elements
+            //  Set subtype to type of first element, then
+            //  make sure all elements are equivalent. If
+            //  not, then list<any>
+
+            const nodes = node.getChildren();
+
+            // Case 1: Expected list type
+            if (expected != null && expected.type == NPType.LIST) {
+                const subtype = expected.subtype;
+
+                let matchesExpected = true;
+                for (let i = 0; i < npvec.size(nodes); i += 1) {
+                    const node = npvec.at(nodes, i);
+                    const nodeType = res.register(visit(node));
+                    if (res.hasError())
+                        continue;
+                    
+                    if (!nodeType.canUpcast(subtype))
+                        matchesExpected = false;
+                }
+
+                if (res.hasError())
+                    return res;
+                
+                if (matchesExpected)
+                    return res.success(expected);
+            }
+
+            // Case 2: Matching list element types
+            if (npvec.size(nodes) > 0) {
+                const nodes = node.getChildren();
+                const subtype = res.register(visit(npvec.at(nodes, 0)));
+                if (res.hasError())
+                    return res;
+
+                let matchesExpected = true;
+                for (let i = 1; i < npvec.size(nodes); i += 1) {
+                    const node = npvec.at(nodes, i);
+                    const nodeType = res.register(visit(node));
+                    if (res.hasError())
+                        continue;
+                    
+                    if (nodeType != subtype)
+                        matchesExpected = false;
+                }
+
+                if (res.hasError())
+                    return res;
+                
+                if (matchesExpected)
+                    return res.success(NPList(subtype));
+            }
+            
+            // Case 3: Empty list or default for other cases
+            return res.success(NPList(NPAny.get()));
+        }
+
+        // Operations [ ]
+        else if (nodeType == NodeType.CAST) {
+            return typeLookup(node.getCastType());
+        }
+        else if (nodeType == NodeType.BINARY) {
+            const res = TypeResult();
+            const leftType = res.register(visit(node.getLeft()));
+            const rightType = res.register(visit(node.getRight()));
+
+            if (res.hasError())
+                return res;
+            
+            const opcode = TypeOperations.fromOpcode(node.getOpcode());
+            const operation = leftType.operation(opcode);
+            const outType = operation(npvec.vec(rightType), 1);
+            if (outType.type == NPType.ERROR)
+                return res.typeFailure(outType, node.getRight());
+            return res.success(outType);
+        }
+        else if (nodeType == NodeType.UNARY) {
+            const res = TypeResult();
+            const opType = res.register(visit(node.getOperand()));
+
+            if (res.hasError())
+                return res;
+            
+            const opcode = TypeOperations.fromOpcode(node.getOpcode());
+            const operation = opType.operation(opcode);
+            const outType = operation(npvec.vec(), 0);
+            if (outType.type == NPType.ERROR)
+                return res.typeFailure(outType, node.getOperand());
+            return res.success(outType);
+        }
+
+        // Variables [ ]
+
+        // Functions [ ]
+
+        // Control Flow [ ]
+        
+        // Classes
+
+        return TypeResult().success(NPVoid.get());
+    }
+
+    func prv typeLookup(unres) {
+        return TypeResult().success(rootPackage.typeLookup(unres));
+    }
+
+    func prv getVariableType(name) {
+        for (let i = scopeDepth - 1; i >= 0; i += 1) {
+            const localScope = npvec.at(localStack, i);
+            if (npmap.has(localScope, name))
+                return npmap.get(localScope, name);
+        }
+
+        if (npmap.has(globals, name))
+            return npmap.get(globals, name);
+        
+        return null;
+    }
+}

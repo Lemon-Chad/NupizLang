@@ -24,14 +24,14 @@ class UnresolvedIdentifier {
 }
 
 class UnresolvedType {
-    let prv path;
-    let prv args;
-    let prv nullable;
+    let pub path;
+    let pub args;
+    let pub nullable;
 
-    build(oPath, oArgs, oNullable) {
-        path = oPath;
-        args = oArgs;
-        nullable = oNullable;
+    build(path, args, nullable) {
+        this.path = path;
+        this.args = args;
+        this.nullable = nullable;
     }
 
     func pub getPath() {

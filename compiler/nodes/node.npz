@@ -38,6 +38,8 @@ class NodeType {
     const pub static OR             =   32;
     const pub static IMPORT_FILE    =   33;
     const pub static SUPER_INVOKE   =   34;
+    const pub static PACKAGE        =   35;
+    const pub static CAST           =   36;
 }
 
 class Node {
@@ -94,5 +96,35 @@ class Node {
         idx = start.idx;
         len = end.idx + end.len - start.idx;
         return this;
+    }
+}
+
+class PackageNode <- Node {
+    let prv packagePath;
+    let prv body;
+
+    build(oPath, oBody) {
+        packagePath = oPath;
+        body = oBody;
+
+        type = NodeType.PACKAGE;
+    }
+
+    func pub getBody() {
+        return body;
+    }
+
+    func pub getPath() {
+        return packagePath;
+    }
+
+    func def string() {
+        let res = "Package('";
+        for (let i = 0; i < npvec.size(packagePath); i += 1)
+            res += std.asString(npvec.at(packagePath, i)) + ".";
+        if (npvec.size(packagePath) > 0)
+            res = std.slice(res, 0, -2);
+        res += "', " + std.asString(body) + ")";
+        return res;
     }
 }

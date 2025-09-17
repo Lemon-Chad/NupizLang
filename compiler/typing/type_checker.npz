@@ -71,6 +71,114 @@ class TypeResult {
     }
 }
 
+// Represents a typed variable that
+// may hold dependencies on other variables
+class TypedVariable {
+    let pub name;
+    let pub varType;
+    let pub isFunction;
+
+    let pub dependencies;
+    let pub dependencyCount;
+
+    let pub visited;
+
+    build(name, varType) {
+        this.name = name;
+        this.varType = varType;
+
+        this.dependencies = npmap.map();
+        this.dependencyCount = 0;
+        
+        this.isFunction = false;
+        this.visited = false;
+    }
+
+    func pub addDependency(dependency) {
+        if (npmap.has(dependency.name))
+            return;
+        
+        dependencyCount += 1
+        npmap.emplace(dependecies, dependency.name, dependency);
+    }
+
+    func pub isResolved() {
+        if (this.visited)
+            return true;
+        
+        if (varType == null)
+            return false;
+
+        this.visited = true;
+        for (let i = 0; i < dependencyCount; i += 1) {
+            if (!npvec.at(dependencies, i).isResolved()) {
+                this.visited = false;
+                return false;
+            }
+        }
+        this.visited = false;
+
+        return true;
+    }
+
+    func pub resolveDependency(dependency) {
+        if (this.visited)
+            return;
+        
+        if (npmap.has(dependency.name) && 
+                !npmap.get(dependecies, dependency.name)
+                    .isResolved())
+            npmap.put(dependencies, dependency.name, dependency);
+        
+        this.visited = true;
+        for (let i = 0; i < dependencyCount; i += 1)
+            npvec.at(dependecies, i).resolveDependency(dependency);
+        this.visited = false;
+    }
+}
+
+// Represents a function that might be dependent
+// on undefined variables. Allows backpatching and
+// fixing of such functions when defined, or
+// catching undefined global variables early.
+class TypedFunction <- TypedVariable {
+    let pub argNames;
+    let pub argTypes;
+    let pub argc;
+    let pub returnType;
+
+    let pub body;
+    
+    build(name, argNames, argTypes, returnType, body) {
+        this.name = name;
+        this.argc = npvec.size(argNames);
+        this.argNames = argNames;
+        this.argTypes = argTypes;
+        this.returnType = returnType;
+
+        const subtypes = npvec.vec();
+        for (let i = 0; i < argc; i += 1)
+            npvec.append(subtypes, npvec.at(argTypes, i));
+        npvec.append(subtypes, returnType);
+
+        this.varType = NPFunction(subtypes);
+
+        this.dependencies = npmap.map();
+        this.dependencyCount = 0;
+
+        for (let i = 0; i < this.argc; i += 1) {
+            addDependency(TypedVariable(
+                npvec.at(argNames, i),
+                npvec.at(argTypes, i)
+            ));
+        }
+
+        this.body = body;
+
+        this.isFunction = true;
+    }
+}
+
 class TypeChecker {
     let prv rootPackage;
 
@@ -79,32 +187,18 @@ class TypeChecker {
     let prv packageStack;
 
     // Global variable scopes
-    // Holds name: type
+    // Holds name: TypedVariable
     let prv globals;
 
     // Stack of local variable scopes
-    // Holds [{ name: type }]
+    // Holds [{ name: TypedVariable }]
     let prv localStack;
     let prv scopeDepth;
 
-    // Holds all global variables that reference
-    // an unresolved global variables
-    // Such as:
-    //
-    // func add(x) => x + y;
-    // let y = 4;
-    //
-    // Since `y` was defined after `add`, `add` is held
-    // in unresolvedDependencies until `y` is defined.
-    //
-    // If `add` is called before `y` is defined, an exception
-    // will be raised.
-    //
-    // Once `y` is defined, `add` is re-type checked.
-    //
-    // Holds { name: dependency }
-
-    let prv unresolvedDependencies;
+    // Holds the stack of all functions currently
+    // being defined.
+    let prv functionStack;
+    let prv functionDepth;
 
     build(root) {
         rootPackage = root;
@@ -114,7 +208,9 @@ class TypeChecker {
         globals = npmap.map();
         localStack = npvec.vec();
         scopeDepth = 0;
-        unresolvedDependencies = npmap.map();
+
+        functionStack = npvec.vec();
+        functionDepth = 0;
     }
 
     func pub check(ast) {
@@ -279,6 +375,10 @@ class TypeChecker {
                 return res.typeFailure(outType, node.getOperand());
             return res.success(outType);
         }
+        else if (nodeType == NodeType.CALL) {
+            const res = TypeResult();
+
+        }
 
         // Variables [ ]
 
@@ -295,16 +395,28 @@ class TypeChecker {
         return TypeResult().success(rootPackage.typeLookup(unres));
     }
 
-    func prv getVariableType(name) {
+    func prv addDependency(var) {
+        for (let i = 0; i < functionDepth; i += 1) {
+
+        }
+    }
+
+    func prv getTypedVariable(name) {
         for (let i = scopeDepth - 1; i >= 0; i += 1) {
             const localScope = npvec.at(localStack, i);
             if (npmap.has(localScope, name))
                 return npmap.get(localScope, name);
         }
 
-        if (npmap.has(globals, name))
-            return npmap.get(globals, name);
+        if (npmap.has(globals, name)) {
+            const typedVariable = npmap.get(globals, name);
+
+            addDependency(typedVariable);
+            
+            return typedVariable;
+        }
         
+        addDependency(TypedVariable(name, null));
         return null;
     }
 }

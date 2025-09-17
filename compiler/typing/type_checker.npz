@@ -77,6 +77,7 @@ class TypedVariable {
     let pub name;
     let pub varType;
     let pub isFunction;
+    let pub isConstant;
 
     let pub dependencies;
     let pub dependencyCount;
@@ -92,13 +93,14 @@ class TypedVariable {
         
         this.isFunction = false;
         this.visited = false;
+        this.isConstant = false;
     }
 
     func pub addDependency(dependency) {
         if (npmap.has(dependency.name))
             return;
         
-        dependencyCount += 1
+        dependencyCount += 1;
         npmap.emplace(dependecies, dependency.name, dependency);
     }
 
@@ -125,7 +127,7 @@ class TypedVariable {
         if (this.visited)
             return;
         
-        if (npmap.has(dependency.name) && 
+        if (npmap.has(dependencies, dependency.name) && 
                 !npmap.get(dependecies, dependency.name)
                     .isResolved())
             npmap.put(dependencies, dependency.name, dependency);
@@ -135,6 +137,11 @@ class TypedVariable {
             npvec.at(dependecies, i).resolveDependency(dependency);
         this.visited = false;
     }
+
+    func def eq(other) {
+        return name == other.name && 
+            varType == other.varType;
+    }
 }
 
 // Represents a function that might be dependent
@@ -142,40 +149,36 @@ class TypedVariable {
 // fixing of such functions when defined, or
 // catching undefined global variables early.
 class TypedFunction <- TypedVariable {
-    let pub argNames;
-    let pub argTypes;
+    let pub args;
     let pub argc;
     let pub returnType;
 
     let pub body;
     
-    build(name, argNames, argTypes, returnType, body) {
+    build(name, args, returnType, body) {
         this.name = name;
         this.argc = npvec.size(argNames);
-        this.argNames = argNames;
-        this.argTypes = argTypes;
+        this.args = args;
         this.returnType = returnType;
 
         const subtypes = npvec.vec();
         for (let i = 0; i < argc; i += 1)
-            npvec.append(subtypes, npvec.at(argTypes, i));
+            npvec.append(subtypes, npvec.at(args, i).varType);
         npvec.append(subtypes, returnType);
 
         this.varType = NPFunction(subtypes);
+        this.varType.typedFunction = this;
 
         this.dependencies = npmap.map();
         this.dependencyCount = 0;
 
-        for (let i = 0; i < this.argc; i += 1) {
-            addDependency(TypedVariable(
-                npvec.at(argNames, i),
-                npvec.at(argTypes, i)
-            ));
-        }
+        for (let i = 0; i < this.argc; i += 1)
+            addDependency(npvec.at(args, i));
 
         this.body = body;
 
         this.isFunction = true;
+        this.isConstant = false;
     }
 }
 
@@ -214,7 +217,59 @@ class TypeChecker {
     }
 
     func pub check(ast) {
+        scopeDepth -= 1;
         return visit(ast);
+    }
+
+    func pub beginScope() {
+        scopeDepth += 1;
+        if (scopeDepth > 0)
+            npvec.append(localStack, npmap.map());
+    }
+
+    func pub endScope() {
+        if (scopeDepth > 0)
+            npvec.pop(localStack);
+        scopeDepth -= 1;
+    }
+
+    func pub declareLocal(v) {
+        if (scopeDepth == 0)
+            return;
+        addDependency(v);
+        return npmap.emplace(
+            npvec.at(localStack, -1),
+            v.name, v
+        );
+    }
+
+    func pub declareGlobal(v) {
+        if (!npmap.emplace(globals, v.name, v))
+            return false;
+        
+        resolveDependency(v);
+
+        return true;
+    }
+
+    // func is a TypedFunction
+    // Declares all arguments for the function
+    // as locals automatically
+    func pub beginFunction(fn) {
+        beginScope();
+
+        npvec.append(functionStack, fn);
+        functionDepth += 1;
+
+        for (let i = 0; i < fn.argc; i += 1)
+            declareLocal(npvec.at(fn.args, i));
+    }
+
+    // Returns the function
+    func pub endFunction() {
+        endScope();
+        functionDepth -= 1;
+        return npvec.pop(functionStack);
     }
 
     func prv addRelativePath(path) {
@@ -251,9 +306,15 @@ class TypeChecker {
         } 
         else if (nodeType == NodeType.BODY) {
             const res = TypeResult();
+
+            beginScope();
+
             const nodes = node.getChildren();
             for (let i = 0; i < npvec.size(nodes); i += 1)
                 res.register(visit(npvec.at(nodes, i)));
+            
+            endScope();
+
             return res;
         }
 
@@ -375,12 +436,85 @@ class TypeChecker {
                 return res.typeFailure(outType, node.getOperand());
             return res.success(outType);
         }
-        else if (nodeType == NodeType.CALL) {
-            const res = TypeResult();
-
-        }
 
         // Variables [ ]
+        else if (nodeType == NodeType.DECLARE_GLOBAL) {
+            const res = TypeResult();
+
+            let varType;
+            if (node.getVarType() != null)
+                varType = res.register(typeLookup(node.getVarType()));
+            
+            const valType = res.register(
+                visitExpected(
+                    node.getValue(), 
+                    varType
+                )
+            );
+
+            if (res.hasError())
+                return res;
+            
+            if (varType == null)
+                varType = valType;
+            if (!valType.canUpcast(varType))
+                return res.failure(
+                    "Type Mismatch",
+                    "Expected '" + std.asString(varType) + 
+                    "', got '" + std.asString(valType) + "'.",
+                    node.getValue()
+                );
+            
+            const tvar = TypedVariable(node.getName(), varType);
+            tvar.isConstant = node.getConstant();
+            if (!declareGlobal(tvar))
+                return res.failure(
+                    "Redeclared Variable",
+                    "Global variable '" + node.getName() +
+                    "' has been declared previously.",
+                    node
+                );
+            return res.success(varType);
+        }
+        else if (nodeType == NodeType.GET_GLOBAL) {
+            const res = TypeResult();
+            const varType = getTypedGlobal(node.getName());
+            if (!varType.isResolved())
+                return res.failure(
+                    "Undefined Variable",
+                    "Global variable '" + node.getName() +
+                    "' is undefined.",
+                    node
+                );
+            return res.success(varType.varType);
+        }
+        else if (nodeType == NodeType.SET_GLOBAL) {
+            const res = TypeResult();
+            const varType = getTypedGlobal(node.getName());
+            if (!varType.isResolved())
+                return res.failure(
+                    "Undefined Variable",
+                    "Global variable '" + node.getName() +
+                    "' is undefined.",
+                    node
+                );
+            const valType = res.register(
+                visitExpected(
+                    node.getValue(), 
+                    varType.varType
+                )
+            );
+            if (res.hasError())
+                return res;
+            if (!valType.canUpcast(varType.varType))
+                return res.failure(
+                    "Type Mismatch",
+                    "Expected '" + std.asString(varType.varType) +
+                    "', got '" + std.asString(valType) + "'.",
+                    node.getValue()
+                );
+            return res.success(varType);
+        }
 
         // Functions [ ]
 
@@ -395,19 +529,44 @@ class TypeChecker {
         return TypeResult().success(rootPackage.typeLookup(unres));
     }
 
-    func prv addDependency(var) {
-        for (let i = 0; i < functionDepth; i += 1) {
-
-        }
+    func prv addDependency(v) {
+        if (functionDepth == 0)
+            return;
+        npvec.at(functionDepth, -1).addDependency(v);
     }
 
-    func prv getTypedVariable(name) {
+    func prv resolveDependency(v) {
+        const keys = npmap.keys(globals);
+        for (let i = 0; i < npvec.size(keys); i += 1)
+            npmap.get(globals, npvec.at(keys, i))
+                .resolveDependency(v);
+    }
+
+    func prv isResolved() {
+        const keys = npmap.keys(globals);
+        for (let i = 0; i < npvec.size(keys); i += 1)
+            if (!npmap.get(globals, npvec.at(keys, i))
+                    .isResolved())
+                return false;
+        return true;
+    }
+
+    func prv getTypedLocal(name) {
         for (let i = scopeDepth - 1; i >= 0; i += 1) {
             const localScope = npvec.at(localStack, i);
-            if (npmap.has(localScope, name))
-                return npmap.get(localScope, name);
+            if (npmap.has(localScope, name)) {
+                const typedVariable = npmap.get(localScope, name);
+            
+                addDependency(typedVariable);
+
+                return typedVariable;
+            }
         }
 
+        return null;
+    }
+
+    func prv getTypedGlobal(name) {
         if (npmap.has(globals, name)) {
             const typedVariable = npmap.get(globals, name);
 
@@ -415,8 +574,17 @@ class TypeChecker {
             
             return typedVariable;
         }
-        
-        addDependency(TypedVariable(name, null));
-        return null;
+
+        const nu = TypedVariable(name, null);
+        addDependency(nu);
+        return nu;
+    }
+
+    func prv getTypedVariable(name) {
+        const loc = getTypedLocal(name);
+        if (loc != null)
+            return loc;
+
+        return getTypedGlobal(name);
     }
 }

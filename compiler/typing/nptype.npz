@@ -99,7 +99,7 @@ class NPType {
                     "Missing Operand",
                     "Expected 1 operand, got " + std.asString(argc) + "." 
                 );
-            if (npvec.at(argv, 0) != in)
+            if (!npvec.at(argv, 0).canUpcast(in))
                 return NPError(
                     "Type Mismatch",
                     "Expected '" + std.asString(in) + 
@@ -131,13 +131,13 @@ class NPType {
                     "Missing Operand",
                     "Expected 2 operands, got " + std.asString(argc) + "."
                 );
-            if (npvec.at(argv, 0) != in1)
+            if (!npvec.at(argv, 0).canUpcast(in1))
                 return NPError(
                     "Type Mismatch",
                     "Expected '" + std.asString(in1) + 
                     "', got '" + std.asString(npvec.at(argv, 0)) + "'."
                 );
-            if (npvec.at(argv, 1) != in2)
+            if (!npvec.at(argv, 1).canUpcast(in2))
                 return NPError(
                     "Type Mismatch",
                     "Expected '" + std.asString(in2) + 
@@ -452,6 +452,7 @@ class NPList <- NPType {
 
 class NPFunction <- NPType {
     let pub subtypes;
+    let pub typedFunction;
 
     build(subtypes) {
         name = "function";
@@ -463,6 +464,8 @@ class NPFunction <- NPType {
         operations = npmap.map(
             TypeOperations.CALL, this.call
         );
+
+        typedFunction = null;
     }
 
     func call(argv, argc) {
@@ -483,7 +486,7 @@ class NPFunction <- NPType {
         return npvec.at(subtypes, -1);
     }
 
-    func canUpcast(other) {
+    func pub canUpcast(other) {
         if (other.type == NPType.ANY)
             return true;
         

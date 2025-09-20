@@ -8,6 +8,7 @@ const packagerPkg = import "./type_packager.npz";
 
 const resPkg = import "../parser/result.npz";
 const Error = resPkg.Error;
+const MultiError = resPkg.MultiError;
 
 const nodePkg = import "../nodes/node.npz";
 const NodeType = nodePkg.NodeType;
@@ -52,7 +53,7 @@ class TypeResult {
 
     func pub printErrors() {
         for (let i = 0; i < npvec.size(errors); i += 1)
-            std.println(std.asString(npvec.at(errors, i)));
+            std.println(std.asString(npvec.at(errors, i)) + "\n");
     }
 
     func pub failure(name, desc, node) {
@@ -60,6 +61,21 @@ class TypeResult {
             node.getFilename(), node.getSrc(),
             node.getIdx(), node.getLen(),
             name, desc
+        );
+        npvec.append(errors, error);
+
+        return this;
+    }
+
+    func pub multifailure(name, desc, node1, node2) {
+        const error = MultiError(
+            node1.getFilename(), node1.getSrc(),
+            node1.getIdx(), node1.getLen(),
+            name, desc
+        );
+        error.setSecond(
+            node2.getFilename(), node2.getSrc(),
+            node2.getIdx(), node2.getLen()
         );
         npvec.append(errors, error);
 
@@ -78,6 +94,7 @@ class TypedVariable {
     let pub varType;
     let pub isFunction;
     let pub isConstant;
+    let pub declNode;
 
     let pub dependencies;
     let pub dependencyCount;
@@ -235,7 +252,7 @@ class TypeChecker {
 
     func pub declareLocal(v) {
         if (scopeDepth == 0)
-            return;
+            return false;
         addDependency(v);
         return npmap.emplace(
             npvec.at(localStack, -1),
@@ -466,20 +483,23 @@ class TypeChecker {
                 );
             
             const tvar = TypedVariable(node.getName(), varType);
+            tvar.declNode = node;
             tvar.isConstant = node.getConstant();
+
             if (!declareGlobal(tvar))
-                return res.failure(
+                return res.multifailure(
                     "Redeclared Variable",
                     "Global variable '" + node.getName() +
                     "' has been declared previously.",
-                    node
+                    node,
+                    npmap.get(globals, tvar.name).declNode
                 );
             return res.success(varType);
         }
         else if (nodeType == NodeType.GET_GLOBAL) {
             const res = TypeResult();
             const varType = getTypedGlobal(node.getName());
-            if (!varType.isResolved())
+            if (varType == null)
                 return res.failure(
                     "Undefined Variable",
                     "Global variable '" + node.getName() +
@@ -491,10 +511,90 @@ class TypeChecker {
         else if (nodeType == NodeType.SET_GLOBAL) {
             const res = TypeResult();
             const varType = getTypedGlobal(node.getName());
-            if (!varType.isResolved())
+            if (varType == null)
                 return res.failure(
                     "Undefined Variable",
                     "Global variable '" + node.getName() +
+                    "' is undefined.",
+                    node
+                );
+            const valType = res.register(
+                visitExpected(
+                    node.getValue(), 
+                    varType.varType
+                )
+            );
+            if (res.hasError())
+                return res;
+            if (!valType.canUpcast(varType.varType))
+                return res.failure(
+                    "Type Mismatch",
+                    "Expected '" + std.asString(varType.varType) +
+                    "', got '" + std.asString(valType) + "'.",
+                    node.getValue()
+                );
+            return res.success(varType);
+        }
+        else if (nodeType == NodeType.DECLARE_LOCAL) {
+            const res = TypeResult();
+
+            let varType;
+            if (node.getVarType() != null)
+                varType = res.register(typeLookup(node.getVarType()));
+            
+            const valType = res.register(
+                visitExpected(
+                    node.getValue(), 
+                    varType
+                )
+            );
+
+            if (res.hasError())
+                return res;
+            
+            if (varType == null)
+                varType = valType;
+            if (!valType.canUpcast(varType))
+                return res.failure(
+                    "Type Mismatch",
+                    "Expected '" + std.asString(varType) + 
+                    "', got '" + std.asString(valType) + "'.",
+                    node.getValue()
+                );
+            
+            const tvar = TypedVariable(node.getName(), varType);
+            tvar.declNode = node;
+            tvar.isConstant = node.getConstant();
+
+            if (!declareLocal(tvar))
+                return res.multifailure(
+                    "Redeclared Variable",
+                    "Local variable '" + node.getName() +
+                    "' has been declared previously.",
+                    node,
+                    npmap.get(npvec.at(localStack, -1), tvar.name).declNode
+                );
+            return res.success(varType);
+        }
+        else if (nodeType == NodeType.GET_LOCAL) {
+            const res = TypeResult();
+            const varType = getTypedLocal(node.getName());
+            if (varType == null)
+                return res.failure(
+                    "Undefined Variable",
+                    "Local variable '" + node.getName() +
+                    "' is undefined.",
+                    node
+                );
+            return res.success(varType.varType);
+        }
+        else if (nodeType == NodeType.SET_LOCAL) {
+            const res = TypeResult();
+            const varType = getTypedLocal(node.getName());
+            if (varType == null)
+                return res.failure(
+                    "Undefined Variable",
+                    "Local variable '" + node.getName() +
                     "' is undefined.",
                     node
                 );
@@ -575,9 +675,7 @@ class TypeChecker {
             return typedVariable;
         }
 
-        const nu = TypedVariable(name, null);
-        addDependency(nu);
-        return nu;
+        return null;
     }
 
     func prv getTypedVariable(name) {

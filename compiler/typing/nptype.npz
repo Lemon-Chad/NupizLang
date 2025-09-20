@@ -1,5 +1,6 @@
 import std;
 import npmap;
+import npvec;
 
 unpack import "../compiler/op_codes.npz";
 
@@ -512,7 +513,7 @@ class NPFunction <- NPType {
     }
 
     func def string() {
-        let res = "(" + npvec.at(subtypes, -1) + ")" + "(";
+        let res = "(" + std.asString(npvec.at(subtypes, -1)) + ")" + "(";
         for (let i = 0; i < npvec.size(subtypes) - 1; i += 1)
             res += std.asString(npvec.at(subtypes, i)) + ", ";
         

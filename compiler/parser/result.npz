@@ -47,6 +47,56 @@ class Error {
     }
 }
 
+class MultiError <- Error {
+    let pub filename2;
+    let pub src2;
+    let pub idx2;
+    let pub len2;
+
+    build(filename, src, idx, len, name, desc) {
+        this.filename = filename;
+        this.src = src;
+        this.idx = idx;
+        this.len = len;
+
+        this.name = name;
+        this.desc = desc;
+    }
+
+    func pub setSecond(filename2, src2, idx2, len2) {
+        this.filename2 = filename2;
+        this.src2 = src2;
+        this.idx2 = idx2;
+        this.len2 = len2;
+
+        return this;
+    }
+
+    func def string() {
+        if (idx == -1 || len == -1) {
+            if (filename == null)
+                return name + ": " + desc;
+            return name + ": " + desc + "\n" + "File " + filename;
+        }
+
+        const line = formatPkg.idxToLine(src, idx) + 1;
+        const line2 = formatPkg.idxToLine(src2, idx2) + 1;
+
+        const header = name + ": " + desc;
+        const pos1 = "File " + filename + ", line " +
+            std.asString(line) + "\n" +
+            formatPkg.addMargin(formatPkg.underlineCode(src, idx, len), "│ ");
+        const pos2 = "File " + filename2 + ", line " +
+            std.asString(line2) + "\n" +
+            formatPkg.addMargin(formatPkg.underlineCode(src2, idx2, len2), "  ");
+        
+
+        return header + "\n" +
+            pos1 + "\n│\n│\n" +
+            pos2;
+    }
+}
+
 class Tip <- Error {
     let pub tip;
 

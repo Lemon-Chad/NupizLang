@@ -40,6 +40,7 @@ class NodeType {
     const pub static SUPER_INVOKE   =   34;
     const pub static PACKAGE        =   35;
     const pub static CAST           =   36;
+    const pub static DENULL         =   37;
 }
 
 class Node {

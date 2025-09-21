@@ -184,6 +184,8 @@ class NPType {
     func pub canUpcast(other) {
         if (other.type == NPType.ANY)
             return true;
+        if (other.type == NPType.OPTIONAL)
+            return canUpcast(other.subtype);
         
         if (this == other)
             return true;
@@ -437,6 +439,8 @@ class NPList <- NPType {
     func pub canUpcast(other) {
         if (other.type == NPType.ANY)
             return true;
+        if (other.type == NPType.OPTIONAL)
+            return canUpcast(other.subtype);
         
         if (other.type != NPType.LIST)
             return false;
@@ -494,6 +498,8 @@ class NPFunction <- NPType {
     func pub canUpcast(other) {
         if (other.type == NPType.ANY)
             return true;
+        if (other.type == NPType.OPTIONAL)
+            return canUpcast(other.subtype);
         
         if (other.type != NPType.FUNCTION)
             return false;

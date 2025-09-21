@@ -431,3 +431,25 @@ class CastNode <- Node {
         return "(" + std.asString(unresolved) + ")(" + std.asString(node) + ")";
     }
 }
+
+class DenullNode <- Node {
+    let prv node;
+
+    build(oNode) {
+        node = oNode;
+
+        type = NodeType.DENULL;
+    }
+
+    func getChildren() {
+        return npvec.vec(node);
+    }
+
+    func pub getNode() {
+        return node;
+    }
+
+    func def string() {
+        return std.asString(node) + "!";
+    }
+}

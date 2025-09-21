@@ -78,7 +78,7 @@ class Parser {
             TokenType.PLUS,             [null,      binary, Precedence.TERM],
             TokenType.SLASH,            [null,      binary, Precedence.FACTOR],
             TokenType.STAR,             [null,      binary, Precedence.FACTOR],
-            TokenType.BANG,             [unary,     null,   Precedence.NONE],
+            TokenType.BANG,             [unary,     denull, Precedence.PRIMARY],
             TokenType.BANG_EQUAL,       [null,      binary, Precedence.EQUALITY],
             TokenType.EQUAL_EQUAL,      [null,      binary, Precedence.EQUALITY],
             TokenType.GREATER,          [null,      binary, Precedence.COMPARISON],
@@ -1670,6 +1670,13 @@ class Parser {
         return res.success(CastNode(left, castType).setSource(
             left.filename, left.src, left.idx,
             previous.idx + previous.len - left.idx
+        ));
+    }
+
+    func prv denull(left, canAssign) {
+        return ParseResult().success(DenullNode(left).setSource(
+            left.filename, left.src, 
+            left.idx, left.len
         ));
     }
 

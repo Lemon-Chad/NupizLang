@@ -277,8 +277,10 @@ static bool invokeFromClass(VM* vm, ObjClass* clazz, ObjString* name, int argc, 
 static bool invoke(VM* vm, ObjString* name, int argc) {
     Value reciever = peek(vm, argc);
 
-    if (!IS_OBJ(reciever))
+    if (!IS_OBJ(reciever)) {
+        runtimeError(vm, "Cannot call method on non-instance.");
         return false;
+    }
     
     switch (OBJ_TYPE(reciever)) {
         case OBJ_INSTANCE: {

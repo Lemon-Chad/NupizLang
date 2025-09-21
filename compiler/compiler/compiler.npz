@@ -353,7 +353,9 @@ class Compiler {
         compiler.beginScope();
 
         for (let i = 0; i < compiler.function.arity; i += 1)
-            compiler.addLocal(npvec.at(args, i), true);
+            compiler.addLocal(
+                npvec.at(args, i).getIdentifier(), true
+            );
         compiler.compile(fn.getBody());
 
         compiler.endScope();
@@ -506,7 +508,8 @@ class Compiler {
             emitConstant(Value.Function(function), node.getLine());
             emitByte(OpCode.IMPORT_FILE, node.getLine());
         }
-        else if (nodeType == NodeType.CAST) {
+        else if (nodeType == NodeType.CAST ||
+                nodeType == NodeType.DENULL) {
             compileNode(node.getNode());
         }
         

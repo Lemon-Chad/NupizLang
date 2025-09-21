@@ -323,7 +323,6 @@ class TypeChecker {
         return newPath;
     }
 
-    // TODO: Visit function for a typed function
     func prv visitFunction(tFunction) {
         const res = TypeResult();
         if (tFunction.isChecked())
@@ -359,6 +358,38 @@ class TypeChecker {
             tvar.typedFunction = varType.typedFunction;
             varType.typedFunction.varType = tvar;
         }
+    }
+
+    func prv call(fType, args, node) {
+        const res = TypeResult();
+        if (fType.type == NPType.FUNCTION &&
+                fType.typedFunction != null) {
+            res.register(visitFunction(fType.typedFunction));
+            if (res.hasError())
+                return res;
+        }
+
+        const argc = npvec.size(args);
+        const argv = npvec.vec();
+        for (let i = 0; i < argc; i += 1) {
+            let expected = null;
+            if (fType.type == NPType.FUNCTION && 
+                    i < npvec.size(fType.subtypes))
+                expected = npvec.at(fType.subtypes, i);
+            npvec.append(
+                argv,
+                res.register(visitExpected(
+                    npvec.at(args, i),
+                    expected
+                ))
+            );
+        }
+        
+        const operation = fType.operation(TypeOperations.CALL);
+        const outType = operation(argv, argc);
+        if (outType.type == NPType.ERROR)
+            return res.typeFailure(outType, node);
+        return res.success(outType);
     }
 
     func prv visitExpected(node, expected) {
@@ -470,7 +501,6 @@ class TypeChecker {
         }
 
         // [ ] Operations
-        // CallNode
         // InvokeNode
         // SuperInvokeNode
         // GetPropertyNode
@@ -542,35 +572,24 @@ class TypeChecker {
             if (res.hasError())
                 return res;
             
-            if (opType.type == NPType.FUNCTION &&
-                    opType.typedFunction != null) {
-                res.register(visitFunction(opType.typedFunction));
-                if (res.hasError())
-                    return res;
-            }
-
-            const args = node.getArgs();
-            const argc = node.getArgc();
-            const argv = npvec.vec();
-            for (let i = 0; i < argc; i += 1) {
-                let expected = null;
-                if (opType.type == NPType.FUNCTION && 
-                        i < npvec.size(opType.subtypes))
-                    expected = npvec.at(opType.subtypes, i);
-                npvec.append(
-                    argv,
-                    res.register(visitExpected(
-                        npvec.at(args, i),
-                        expected
-                    ))
-                );
-            }
-            
-            const operation = opType.operation(TypeOperations.CALL);
-            const outType = operation(argv, argc);
-            if (outType.type == NPType.ERROR)
-                return res.typeFailure(outType, node);
+            const outType = res.register(call(opType, node.getArgs(), node));
+            if (res.hasError())
+                return res;
             return res.success(outType);
+        }
+        else if (nodeType == NodeType.DENULL) {
+            const res = TypeResult();
+            const opType = res.register(visit(node.getNode()));
+            if (res.hasError())
+                return res;
+            
+            if (opType.type != NPType.OPTIONAL)
+                return res.failure(
+                    "Type Mismatch",
+                    "Expected 'optional', got '" + std.asString(opType) + "'.",
+                    node.getNode()
+                );
+            return res.success(opType.subtype);
         }
 
         // [x] Variables
@@ -662,7 +681,7 @@ class TypeChecker {
                 );
             
             updateVariable(varType.varType, valType);
-            return res.success(varType);
+            return res.success(varType.varType);
         }
         else if (nodeType == NodeType.DECLARE_LOCAL) {
             const res = TypeResult();
@@ -752,10 +771,10 @@ class TypeChecker {
                 );
             
             updateVariable(varType.varType, valType);
-            return res.success(varType);
+            return res.success(varType.varType);
         }
 
-        // [ ] Functions
+        // [x] Functions
         else if (nodeType == NodeType.FUNCTION) {
             // TypedFunction(name, args, returnType, body)
             // NPFunction(subtypes)
@@ -791,8 +810,112 @@ class TypeChecker {
 
             return res.success(fType);
         }
+        else if (nodeType == NodeType.RETURN) {
+            const res = TypeResult();
+            if (functionDepth <= 0)
+                return res.failure(
+                    "Scope Error",
+                    "Cannot return outside of a function.",
+                    node
+                );
+            
+            const expected = npvec.at(functionStack, -1).returnType;
+            const retType = res.register(visitExpected(
+                node.getValue(), expected
+            ));
 
-        // [ ] Control Flow
+            if (res.hasError())
+                return res;
+            if (!retType.canUpcast(expected))
+                return res.failure(
+                    "Type Mismatch",
+                    "Expected function to return '" +
+                    std.asString(expected) + "', got '"
+                    + std.asString(retType) + ".",
+                    node.getValue()
+                );
+            
+            return res.success(NPVoid.get());
+        }
+
+        // [x] Control Flow
+        // Continue node and break node have
+        // literally nothing type related, so
+        // no reason to type check them.
+        else if (nodeType == NodeType.IF) {
+            const res = TypeResult();
+            
+            const condType = res.register(visit(node.getCondition()));
+            res.register(visit(node.getTrue()));
+            if (node.getFalse() != null)
+                res.register(visit(node.getFalse()));
+
+            if (res.hasError())
+                return res;
+            
+            if (condType.type != NPType.BOOLEAN)
+                return res.failure(
+                    "Type Mismatch",
+                    "Expected 'bool' for condition, got '" + std.asString(condType) + "'.",
+                    node.getCondition()
+                );
+            
+            return res.success(NPVoid.get());
+        }
+        else if (nodeType == NodeType.WHILE) {
+            const res = TypeResult();
+            
+            const condType = res.register(visit(node.getCondition()));
+            res.register(visit(node.getBody()));
+            
+            if (res.hasError())
+                return res;
+            
+            if (condType.type != NPType.BOOLEAN)
+                return res.failure(
+                    "Type Mismatch",
+                    "Expected 'bool' for condition, got '" + std.asString(condType) + "'.",
+                    node.getCondition()
+                );
+            
+            return res.success(NPVoid.get());
+        }
+        else if (nodeType == NodeType.FOR) {
+            const res = TypeResult();
+            
+            beginScope();
+
+            let condType;
+            
+            if (node.getInitializer() != null)
+                res.register(visit(node.getInitializer()));
+            if (node.getCondition() != null)
+                condType = res.register(visit(node.getCondition()));
+            if (node.getIterator() != null)
+                res.register(visit(node.getIterator()));
+
+            res.register(visit(node.getBody()));
+            
+            endScope();
+
+            if (res.hasError())
+                return res;
+            
+            if (condType != null && condType.type != NPType.BOOLEAN)
+                return res.failure(
+                    "Type Mismatch",
+                    "Expected 'bool' for condition, got '" + std.asString(condType) + "'.",
+                    node.getCondition()
+                );
+            
+            return res.success(NPVoid.get());
+        }
+        else if (nodeType == NodeType.CONTINUE ||
+                    nodeType == NodeType.BREAK) {
+            return TypeResult().success(NPVoid.get());
+        }
+
+
         
         // [ ] Classes
 

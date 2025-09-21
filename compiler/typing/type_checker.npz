@@ -114,11 +114,11 @@ class TypedVariable {
     }
 
     func pub addDependency(dependency) {
-        if (npmap.has(dependency.name))
+        if (npmap.has(dependencies, dependency.name))
             return;
         
         dependencyCount += 1;
-        npmap.emplace(dependecies, dependency.name, dependency);
+        npmap.emplace(dependencies, dependency.name, dependency);
     }
 
     func pub isResolved() {
@@ -145,13 +145,15 @@ class TypedVariable {
             return;
         
         if (npmap.has(dependencies, dependency.name) && 
-                !npmap.get(dependecies, dependency.name)
+                !npmap.get(dependencies, dependency.name)
                     .isResolved())
             npmap.put(dependencies, dependency.name, dependency);
         
         this.visited = true;
+        const keys = npmap.keys(dependencies);
         for (let i = 0; i < dependencyCount; i += 1)
-            npvec.at(dependecies, i).resolveDependency(dependency);
+            npmap.get(dependencies, npvec.at(keys, i))
+                .resolveDependency(dependency);
         this.visited = false;
     }
 
@@ -171,10 +173,12 @@ class TypedFunction <- TypedVariable {
     let pub returnType;
 
     let pub body;
+
+    let pub checked;
     
     build(name, args, returnType, body) {
         this.name = name;
-        this.argc = npvec.size(argNames);
+        this.argc = npvec.size(args);
         this.args = args;
         this.returnType = returnType;
 
@@ -196,6 +200,17 @@ class TypedFunction <- TypedVariable {
 
         this.isFunction = true;
         this.isConstant = false;
+
+        this.checked = false;
+    }
+
+    func pub isChecked() {
+        return checked;
+    }
+
+    func pub check() {
+        checked = true;
+        return this.body;
     }
 }
 
@@ -308,8 +323,42 @@ class TypeChecker {
         return newPath;
     }
 
+    // TODO: Visit function for a typed function
+    func prv visitFunction(tFunction) {
+        const res = TypeResult();
+        if (tFunction.isChecked())
+            return res;
+      
+        beginFunction(tFunction);
+        res.register(visit(tFunction.check()));
+        endFunction();
+
+        return res;
+    }
+
     func prv visit(node) {
         return visitExpected(node, null);
+    }
+
+    func prv makeTypedVariable(name, varType, valType) {
+        if (varType != null 
+                && varType.type == NPType.FUNCTION 
+                && valType.type == NPType.FUNCTION 
+                && valType.typedFunction != null) {
+            valType.typedFunction.name = name;
+            varType.typedFunction = valType.typedFunction;
+            valType.typedFunction.varType = varType;
+            return varType.typedFunction;
+        }
+        return TypedVariable(name, varType);
+    }
+
+    func prv updateVariable(tvar, varType) {
+        if (varType.type == NPType.FUNCTION &&
+                varType.typedFunction != null) {
+            tvar.typedFunction = varType.typedFunction;
+            varType.typedFunction.varType = tvar;
+        }
     }
 
     func prv visitExpected(node, expected) {
@@ -335,7 +384,7 @@ class TypeChecker {
             return res;
         }
 
-        // Literals [ ]
+        // [x] Literals
         else if (nodeType == NodeType.NUMBER) {
             return TypeResult().success(NPNumber.get());
         }
@@ -420,7 +469,15 @@ class TypeChecker {
             return res.success(NPList(NPAny.get()));
         }
 
-        // Operations [ ]
+        // [ ] Operations
+        // CallNode
+        // InvokeNode
+        // SuperInvokeNode
+        // GetPropertyNode
+        // SetPropertyNode
+        // SetIndexNode
+        // ImportNode
+        // ImportFileNode
         else if (nodeType == NodeType.CAST) {
             return typeLookup(node.getCastType());
         }
@@ -453,8 +510,71 @@ class TypeChecker {
                 return res.typeFailure(outType, node.getOperand());
             return res.success(outType);
         }
+        else if (nodeType == NodeType.AND ||
+            nodeType == NodeType.OR) {
+            const res = TypeResult();
+            const leftType = res.register(visit(node.getLeft()));
+            const rightType = res.register(visit(node.getRight()));
 
-        // Variables [ ]
+            if (res.hasError())
+                return res;
+            
+            if (leftType != NPBoolean.get())
+                res.failure(
+                    "Type Mismatch",
+                    "Expected 'bool', got " + std.asString(leftType) + ".",
+                    node.getLeft()
+                );
+            if (rightType != NPBoolean.get())
+                res.failure(
+                    "Type Mismatch",
+                    "Expected 'bool', got " + std.asString(rightType) + ".",
+                    node.getRight()
+                );
+            if (res.hasError())
+                return res;
+            
+            return res.success(NPBoolean.get());
+        }
+        else if (nodeType == NodeType.CALL) {
+            const res = TypeResult();
+            const opType = res.register(visit(node.getOperand()));
+            if (res.hasError())
+                return res;
+            
+            if (opType.type == NPType.FUNCTION &&
+                    opType.typedFunction != null) {
+                res.register(visitFunction(opType.typedFunction));
+                if (res.hasError())
+                    return res;
+            }
+
+            const args = node.getArgs();
+            const argc = node.getArgc();
+            const argv = npvec.vec();
+            for (let i = 0; i < argc; i += 1) {
+                let expected = null;
+                if (opType.type == NPType.FUNCTION && 
+                        i < npvec.size(opType.subtypes))
+                    expected = npvec.at(opType.subtypes, i);
+                npvec.append(
+                    argv,
+                    res.register(visitExpected(
+                        npvec.at(args, i),
+                        expected
+                    ))
+                );
+            }
+            
+            const operation = opType.operation(TypeOperations.CALL);
+            const outType = operation(argv, argc);
+            if (outType.type == NPType.ERROR)
+                return res.typeFailure(outType, node);
+            return res.success(outType);
+        }
+
+        // [x] Variables
+        // [ ] SuperNode
         else if (nodeType == NodeType.DECLARE_GLOBAL) {
             const res = TypeResult();
 
@@ -482,7 +602,7 @@ class TypeChecker {
                     node.getValue()
                 );
             
-            const tvar = TypedVariable(node.getName(), varType);
+            const tvar = makeTypedVariable(node.getName(), varType, valType);
             tvar.declNode = node;
             tvar.isConstant = node.getConstant();
 
@@ -524,6 +644,13 @@ class TypeChecker {
                     varType.varType
                 )
             );
+            if (varType.isConstant)
+                res.multifailure(
+                    "Constant Modification",
+                    "Cannot modify constant '" + node.getName() + "'.",
+                    node, varType.declNode
+                );
+            
             if (res.hasError())
                 return res;
             if (!valType.canUpcast(varType.varType))
@@ -533,6 +660,8 @@ class TypeChecker {
                     "', got '" + std.asString(valType) + "'.",
                     node.getValue()
                 );
+            
+            updateVariable(varType.varType, valType);
             return res.success(varType);
         }
         else if (nodeType == NodeType.DECLARE_LOCAL) {
@@ -562,7 +691,7 @@ class TypeChecker {
                     node.getValue()
                 );
             
-            const tvar = TypedVariable(node.getName(), varType);
+            const tvar = makeTypedVariable(node.getName(), varType, valType);
             tvar.declNode = node;
             tvar.isConstant = node.getConstant();
 
@@ -604,6 +733,14 @@ class TypeChecker {
                     varType.varType
                 )
             );
+
+            if (varType.isConstant)
+                res.multifailure(
+                    "Constant Modification",
+                    "Cannot modify constant '" + node.getName() + "'.",
+                    node, varType.declNode
+                );
+
             if (res.hasError())
                 return res;
             if (!valType.canUpcast(varType.varType))
@@ -613,14 +750,51 @@ class TypeChecker {
                     "', got '" + std.asString(valType) + "'.",
                     node.getValue()
                 );
+            
+            updateVariable(varType.varType, valType);
             return res.success(varType);
         }
 
-        // Functions [ ]
+        // [ ] Functions
+        else if (nodeType == NodeType.FUNCTION) {
+            // TypedFunction(name, args, returnType, body)
+            // NPFunction(subtypes)
+            // - subtypes : [ arg1, arg2, ..., return ]
+            const res = TypeResult();
+            const subtypes = npvec.vec();
 
-        // Control Flow [ ]
+            const unresArgs = node.getArgs();
+            const argc = npvec.size(unresArgs);
+            const fType = res.register(typeLookup(node.getAsType()));
+            if (res.hasError())
+                return res;
+            
+            const args = npvec.vec();
+            for (let i = 0; i < argc; i += 1)
+                npvec.append(
+                    args,
+                    TypedVariable(
+                        npvec.at(unresArgs, i).getIdentifier(),
+                        npvec.at(fType.subtypes, i)
+                    )
+                );
+
+            const tFunction = TypedFunction(
+                "<anonymous>", 
+                args, 
+                npvec.at(fType.subtypes, -1),
+                node.getBody()
+            );
+
+            fType.typedFunction = tFunction;
+            tFunction.varType = fType;
+
+            return res.success(fType);
+        }
+
+        // [ ] Control Flow
         
-        // Classes
+        // [ ] Classes
 
         return TypeResult().success(NPVoid.get());
     }
@@ -632,7 +806,7 @@ class TypeChecker {
     func prv addDependency(v) {
         if (functionDepth == 0)
             return;
-        npvec.at(functionDepth, -1).addDependency(v);
+        npvec.at(functionStack, -1).addDependency(v);
     }
 
     func prv resolveDependency(v) {
@@ -652,7 +826,7 @@ class TypeChecker {
     }
 
     func prv getTypedLocal(name) {
-        for (let i = scopeDepth - 1; i >= 0; i += 1) {
+        for (let i = scopeDepth - 1; i >= 0; i -= 1) {
             const localScope = npvec.at(localStack, i);
             if (npmap.has(localScope, name)) {
                 const typedVariable = npmap.get(localScope, name);

@@ -57,7 +57,11 @@ class TypeOperations {
             TypeOperations.BANG,        "!",
             TypeOperations.NEGATE,      "-",
             TypeOperations.UNPACK,      "unpack",
-            TypeOperations.THROW,       "throw"
+            TypeOperations.THROW,       "throw",
+            TypeOperations.CALL,        "call",
+            TypeOperations.GET,         "get",
+            TypeOperations.SET,         "set",
+            TypeOperations.SET_IDX,     "index set"
         );
         
         if (!npmap.has(opcodeMap, opcode))
@@ -491,7 +495,7 @@ class NPFunction <- NPType {
         if (other.type == NPType.ANY)
             return true;
         
-        if (other.type != NPType.Function)
+        if (other.type != NPType.FUNCTION)
             return false;
         if (npvec.size(subtypes) != npvec.size(other.subtypes))
             return false;
@@ -502,7 +506,7 @@ class NPFunction <- NPType {
     }
 
     func def eq(other) {
-        if (other.type != NPType.Function)
+        if (other.type != NPType.FUNCTION)
             return false;
         if (npvec.size(subtypes) != npvec.size(other.subtypes))
             return false;

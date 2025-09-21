@@ -92,7 +92,7 @@ class MultiError <- Error {
         
 
         return header + "\n" +
-            pos1 + "\n│\n│\n" +
+            pos1 + "\n│\n" +
             pos2;
     }
 }
